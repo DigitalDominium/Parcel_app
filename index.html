@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Parcel App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
+    #app { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, select { display: block; margin: 10px 0; padding: 5px; width: 100%; border-radius: 4px; }
+    button { padding: 10px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #0056b3; }
+    .hidden { display: none; }
+    #parcels-list div { padding: 10px; border-bottom: 1px solid #ddd; }
+    #barcode-scanner { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Parcel Management</h1>
+    <div id="login-form">
+      <h2>Login</h2>
+      <input id="login-email" placeholder="Email" />
+      <input id="login-password" type="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+      <button onclick="showRegister()">Register</button>
+    </div>
+    <div id="register-form" class="hidden">
+      <h2>Register</h2>
+      <input id="name" placeholder="Name" />
+      <input id="unit" placeholder="Unit Number" />
+      <input id="email" placeholder="Email" />
+      <input id="password" type="password" placeholder="Password" />
+      <button onclick="register()">Sign Up</button>
+      <button onclick="showLogin()">Back to Login</button>
+    </div>
+    <div id="dashboard" class="hidden">
+      <h2>Welcome, <span id="user-name"></span>!</h2>
+      <div id="guard-actions" class="hidden">
+        <h3>Log New Parcel</h3>
+        <input id="awb-number" placeholder="AWB Number" />
+        <input id="recipient-name" placeholder="Recipient Name" />
+        <input id="recipient-unit" placeholder="Unit Number" />
+        <button onclick="logParcel()">Log Parcel</button>
+      </div>
+      <div id="resident-actions" class="hidden">
+        <h3>Your Parcels</h3>
+        <div id="parcels-list"></div>
+        <div id="barcode-scanner">
+          <input type="text" id="barcode-input" placeholder="Scan AWB Barcode" />
+          <button onclick="collectParcel()">Collect Parcel</button>
+        </div>
+      </div>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </div>
+  <script>
+    let token = null;
+
+    function showRegister() {
+      document.getElementById('login-form').classList.add('hidden');
+      document.getElementById('register-form').classList.remove('hidden');
+    }
+
+    function showLogin() {
+      document.getElementById('register-form').classList.add('hidden');
+      document.getElementById('login-form').classList.remove('hidden');
+    }
+
+    async function register() {
+      const name = document.getElementById('name').value;
+      const unitNumber = document.getElementById('unit').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, unitNumber, email, password }),
+      });
+      const data = await response.json();
+      alert(data.msg);
+      if (data.msg === 'Registration successful. Check your email for verification.') {
+        showLogin(); // Return to login after successful registration
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (data.token) {
+        token = data.token;
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('user-name').textContent = email;
+        const role = data.role;
+        if (role === 'guard') {
+          document.getElementById('guard-actions').classList.remove('hidden');
+        } else {
+          document.getElementById('resident-actions').classList.remove('hidden');
+          loadParcels();
+        }
+        alert(`Logged in as ${role}`);
+      } else {
+        alert(data.msg);
+      }
+    }
+
+    function logout() {
+      token = null;
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('login-form').classList.remove('hidden');
+      document.getElementById('guard-actions').classList.add('hidden');
+      document.getElementById('resident-actions').classList.add('hidden');
+    }
+
+    async function logParcel() {
+      const awbNumber = document.getElementById('awb-number').value;
+      const recipientName = document.getElementById('recipient-name').value;
+      const unitNumber = document.getElementById('recipient-unit').value;
+
+      const response = await fetch('/api/parcels', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ awbNumber, recipientName, unitNumber }),
+      });
+      const data = await response.json();
+      alert(data.msg);
+      document.getElementById('awb-number').value = '';
+      document.getElementById('recipient-name').value = '';
+      document.getElementById('recipient-unit').value = '';
+    }
+
+    async function loadParcels() {
+      const response = await fetch('/api/parcels', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const parcels = await response.json();
+      const parcelsList = document.getElementById('parcels-list');
+      parcelsList.innerHTML = '';
+      parcels.forEach(parcel => {
+        const div = document.createElement('div');
+        div.textContent = `AWB: ${parcel.awbNumber} - Delivered: ${new Date(parcel.deliveredAt).toLocaleString()}`;
+        parcelsList.appendChild(div);
+      });
+    }
+
+    async function collectParcel() {
+      const awbNumber = document.getElementById('barcode-input').value;
+      const response = await fetch('/api/parcels/collect', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ awbNumber }),
+      });
+      const data = await response.json();
+      alert(data.msg);
+      document.getElementById('barcode-input').value = '';
+      loadParcels();
+    }
+  </script>
+</body>
+</html>
