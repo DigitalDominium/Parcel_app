@@ -143,26 +143,31 @@
     }
 
     async function loadParcels() {
-      const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      const parcels = await response.json();
-      const parcelsList = document.getElementById('parcels-list');
-      parcelsList.innerHTML = '';
-
-      if (parcels.length === 0) {
-        parcelsList.innerHTML = '<p>No parcels found.</p>';
-        return;
-      }
-
-      parcels.forEach(parcel => {
-        const div = document.createElement('div');
-        div.textContent = `AWB: ${parcel.awb_number} - Delivered: ${parcel.delivered_at ? new Date(parcel.delivered_at).toLocaleString() : 'Pending'}`;
-        div.dataset.awbNumber = parcel.awb_number;
-        div.onclick = () => selectParcel(div);
-        parcelsList.appendChild(div);
-      });
+        const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    
+        const parcels = await response.json();
+        const parcelsList = document.getElementById('parcels-list');
+        parcelsList.innerHTML = '';
+    
+        const uncollectedParcels = parcels.filter(parcel => !parcel.collected_at); // ✅ Filter out collected parcels
+    
+        if (uncollectedParcels.length === 0) {
+            parcelsList.innerHTML = '<p>No parcels found.</p>';
+            return;
+        }
+    
+        uncollectedParcels.forEach(parcel => {
+            const div = document.createElement('div');
+            div.textContent = `AWB: ${parcel.awb_number} - Status: Pending`;
+            div.dataset.awbNumber = parcel.awb_number;
+            div.onclick = () => selectParcel(div);
+            div.style.cursor = "pointer";
+            div.style.padding = "10px";
+            div.style.borderBottom = "1px solid #ddd";
+            parcelsList.appendChild(div);
+        });
     }
 
     function selectParcel(element) {
@@ -172,23 +177,26 @@
     }
 
     async function collectParcel() {
-      if (!selectedParcelAWB) {
-        alert("Please select a parcel first.");
-        return;
-      }
-
-      const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels/collect', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ awbNumber: selectedParcelAWB }),
-      });
-
-      const data = await response.json();
-      alert(data.msg);
-      loadParcels();
+        if (!selectedParcelAWB) {
+            alert("Please select a parcel first.");
+            return;
+        }
+    
+        const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels/collect', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({ awbNumber: selectedParcelAWB }),
+        });
+    
+        const data = await response.json();
+        alert(data.msg);
+    
+        if (data.msg === "Parcel collected successfully") {
+            loadParcels(); // ✅ Refresh parcels list (collected parcel disappears)
+        }
     }
 
     function logout() {
