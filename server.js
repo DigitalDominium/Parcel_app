@@ -14,7 +14,7 @@ const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' })); // Updated with your Static Site URL
+app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' }));
 
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
@@ -35,6 +35,7 @@ client.connect()
   .then(() => console.log('Connected to PostgreSQL'))
   .catch(err => console.log('PostgreSQL error:', err));
 
+// Register endpoint
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
   try {
@@ -46,6 +47,31 @@ app.post('/api/auth/register', async (req, res) => {
   } catch (err) {
     res.status(500).json({ msg: 'Registration failed' });
   }
+});
+
+// Login endpoint
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const result = await client.query(
+      'SELECT * FROM users WHERE email = $1 AND password = $2',
+      [email, password]
+    );
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      const token = jwt.sign({ id: user.id, role: user.role || 'resident' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      res.json({ token, role: user.role || 'resident' });
+    } else {
+      res.status(401).json({ msg: 'Invalid email or password' });
+    }
+  } catch (err) {
+    res.status(500).json({ msg: 'Login failed' });
+  }
+});
+
+// Protect parcel routes with authentication (placeholder for now)
+app.use('/api/parcels', authenticateToken, (req, res) => {
+  res.status(501).json({ msg: 'Not implemented yet' });
 });
 
 app.get('/', (req, res) => {
