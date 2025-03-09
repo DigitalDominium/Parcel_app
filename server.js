@@ -69,9 +69,41 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Protect parcel routes with authentication (placeholder for now)
-app.use('/api/parcels', authenticateToken, (req, res) => {
-  res.status(501).json({ msg: 'Not implemented yet' });
+// Log new parcel endpoint
+app.post('/api/parcels', authenticateToken, async (req, res) => {
+  const { awbNumber, recipientName, recipientUnit } = req.body;
+  const user = req.user; // Decoded from the JWT token
+  try {
+    if (user.role !== 'guard') {
+      return res.status(403).json({ msg: 'Only guards can log parcels' });
+    }
+    const result = await client.query(
+      'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
+      [awbNumber, recipientName, recipientUnit]
+    );
+    res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ msg: 'Failed to log parcel' });
+  }
+});
+
+// Collect parcel endpoint (placeholder for now)
+app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
+  const { awbNumber } = req.body;
+  const user = req.user; // Decoded from the JWT token
+  try {
+    const result = await client.query(
+      'UPDATE parcels SET collected_at = CURRENT_TIMESTAMP, collected_by = $1 WHERE awb_number = $2 AND collected_at IS NULL RETURNING *',
+      [user.id, awbNumber]
+    );
+    if (result.rows.length > 0) {
+      res.json({ msg: 'Parcel collected successfully', parcel: result.rows[0] });
+    } else {
+      res.status(404).json({ msg: 'Parcel not found or already collected' });
+    }
+  } catch (err) {
+    res.status(500).json({ msg: 'Failed to collect parcel' });
+  }
 });
 
 app.get('/', (req, res) => {
