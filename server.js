@@ -35,13 +35,13 @@ client.connect()
   .then(() => console.log('Connected to PostgreSQL'))
   .catch(err => console.log('PostgreSQL error:', err));
 
-// Register endpoint
+// Register endpoint (always sets role to 'resident')
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
   try {
     await client.query(
-      'INSERT INTO users (name, unit_number, email, password) VALUES ($1, $2, $3, $4)',
-      [name, unitNumber, email, password]
+      'INSERT INTO users (name, unit_number, email, password, role) VALUES ($1, $2, $3, $4, $5)',
+      [name, unitNumber, email, password, 'resident']
     );
     res.json({ msg: 'Registration successful' });
   } catch (err) {
@@ -69,10 +69,30 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Get parcels endpoint
+app.get('/api/parcels', authenticateToken, async (req, res) => {
+  const user = req.user;
+  try {
+    let result;
+    if (user.role === 'guard') {
+      // Guards can see all parcels
+      result = await client.query('SELECT * FROM parcels');
+    } else {
+      // Residents can only see parcels for their unit
+      const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
+      const unitNumber = userResult.rows[0].unit_number;
+      result = await client.query('SELECT * FROM parcels WHERE recipient_unit = $1', [unitNumber]);
+    }
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ msg: 'Failed to retrieve parcels' });
+  }
+});
+
 // Log new parcel endpoint
 app.post('/api/parcels', authenticateToken, async (req, res) => {
   const { awbNumber, recipientName, recipientUnit } = req.body;
-  const user = req.user; // Decoded from the JWT token
+  const user = req.user;
   try {
     if (user.role !== 'guard') {
       return res.status(403).json({ msg: 'Only guards can log parcels' });
@@ -87,10 +107,10 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
   }
 });
 
-// Collect parcel endpoint (placeholder for now)
+// Collect parcel endpoint
 app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
   const { awbNumber } = req.body;
-  const user = req.user; // Decoded from the JWT token
+  const user = req.user;
   try {
     const result = await client.query(
       'UPDATE parcels SET collected_at = CURRENT_TIMESTAMP, collected_by = $1 WHERE awb_number = $2 AND collected_at IS NULL RETURNING *',
