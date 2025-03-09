@@ -35,7 +35,6 @@ client.connect()
   .then(() => console.log('Connected to PostgreSQL'))
   .catch(err => console.log('PostgreSQL error:', err));
 
-// Register endpoint (always sets role to 'resident')
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
   try {
@@ -45,11 +44,11 @@ app.post('/api/auth/register', async (req, res) => {
     );
     res.json({ msg: 'Registration successful' });
   } catch (err) {
+    console.error('Error registering user:', err);
     res.status(500).json({ msg: 'Registration failed' });
   }
 });
 
-// Login endpoint
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -65,31 +64,29 @@ app.post('/api/auth/login', async (req, res) => {
       res.status(401).json({ msg: 'Invalid email or password' });
     }
   } catch (err) {
+    console.error('Error logging in:', err);
     res.status(500).json({ msg: 'Login failed' });
   }
 });
 
-// Get parcels endpoint
 app.get('/api/parcels', authenticateToken, async (req, res) => {
   const user = req.user;
   try {
     let result;
     if (user.role === 'guard') {
-      // Guards can see all parcels
       result = await client.query('SELECT * FROM parcels');
     } else {
-      // Residents can only see parcels for their unit
       const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
       const unitNumber = userResult.rows[0].unit_number;
       result = await client.query('SELECT * FROM parcels WHERE recipient_unit = $1', [unitNumber]);
     }
     res.json(result.rows);
   } catch (err) {
+    console.error('Error retrieving parcels:', err);
     res.status(500).json({ msg: 'Failed to retrieve parcels' });
   }
 });
 
-// Log new parcel endpoint
 app.post('/api/parcels', authenticateToken, async (req, res) => {
   const { awbNumber, recipientName, recipientUnit } = req.body;
   const user = req.user;
@@ -103,11 +100,11 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
     );
     res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
   } catch (err) {
+    console.error('Error logging parcel:', err);
     res.status(500).json({ msg: 'Failed to log parcel' });
   }
 });
 
-// Collect parcel endpoint
 app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
   const { awbNumber } = req.body;
   const user = req.user;
@@ -122,6 +119,7 @@ app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
       res.status(404).json({ msg: 'Parcel not found or already collected' });
     }
   } catch (err) {
+    console.error('Error collecting parcel:', err);
     res.status(500).json({ msg: 'Failed to collect parcel' });
   }
 });
