@@ -13,20 +13,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // Optional, can remove if not needed
-app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' }));
+app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' })); 
 
-const authenticateToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1];
-  if (!token) return res.status(401).json({ msg: 'No token provided' });
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-    if (err) return res.status(403).json({ msg: 'Invalid token' });
-    req.user = decoded;
-    next();
-  });
-};
-
+// Database Connection
 const client = new Client({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -35,8 +24,32 @@ client.connect()
   .then(() => console.log('Connected to PostgreSQL'))
   .catch(err => console.log('PostgreSQL error:', err));
 
+// Authentication Middleware
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+
+  console.log("Received Token:", token); // Debugging Token
+
+  if (!token) {
+    return res.status(401).json({ msg: 'No token provided' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      console.log("Token Verification Failed:", err);
+      return res.status(403).json({ msg: 'Invalid token' });
+    }
+    req.user = decoded;
+    console.log("Decoded User:", req.user); // Debugging User Info
+    next();
+  });
+};
+
+// **Register API**
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
+  console.log("Register Request Body:", req.body); // Debugging
+
   try {
     await client.query(
       'INSERT INTO users (name, unit_number, email, password, role) VALUES ($1, $2, $3, $4, $5)',
@@ -49,13 +62,17 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+// **Login API**
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
+  console.log("Login Request Body:", req.body); // Debugging
+
   try {
     const result = await client.query(
       'SELECT * FROM users WHERE email = $1 AND password = $2',
       [email, password]
     );
+
     if (result.rows.length > 0) {
       const user = result.rows[0];
       const token = jwt.sign({ id: user.id, role: user.role || 'resident' }, process.env.JWT_SECRET, { expiresIn: '1h' });
@@ -69,15 +86,18 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// **Retrieve Parcels API**
 app.get('/api/parcels', authenticateToken, async (req, res) => {
+  console.log("User Role:", req.user.role); // Debugging Role
   const user = req.user;
+
   try {
     let result;
     if (user.role === 'guard') {
       result = await client.query('SELECT * FROM parcels');
     } else {
       const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
-      const unitNumber = userResult.rows[0].unit_number;
+      const unitNumber = userResult.rows[0]?.unit_number;
       result = await client.query('SELECT * FROM parcels WHERE recipient_unit = $1', [unitNumber]);
     }
     res.json(result.rows);
@@ -87,16 +107,22 @@ app.get('/api/parcels', authenticateToken, async (req, res) => {
   }
 });
 
+// **Log New Parcel API**
 app.post('/api/parcels', authenticateToken, async (req, res) => {
+  console.log("Parcel Logging Request Body:", req.body); // Debugging
+  
   const { awbNumber, recipientName, recipientUnit } = req.body;
   const user = req.user;
+
+  if (user.role !== 'guard') {
+    return res.status(403).json({ msg: 'Only guards can log parcels' });
+  }
+  
+  if (!awbNumber || !recipientName || !recipientUnit) {
+    return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
+  }
+
   try {
-    if (user.role !== 'guard') {
-      return res.status(403).json({ msg: 'Only guards can log parcels' });
-    }
-    if (!awbNumber || !recipientName || !recipientUnit) {
-      return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
-    }
     const result = await client.query(
       'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
       [awbNumber, recipientName, recipientUnit]
@@ -108,14 +134,21 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
   }
 });
 
+// **Collect Parcel API**
 app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
   const { awbNumber } = req.body;
   const user = req.user;
+
+  if (!awbNumber) {
+    return res.status(400).json({ msg: 'AWB Number is required' });
+  }
+
   try {
     const result = await client.query(
       'UPDATE parcels SET collected_at = CURRENT_TIMESTAMP, collected_by = $1 WHERE awb_number = $2 AND collected_at IS NULL RETURNING *',
       [user.id, awbNumber]
     );
+
     if (result.rows.length > 0) {
       res.json({ msg: 'Parcel collected successfully', parcel: result.rows[0] });
     } else {
@@ -127,11 +160,7 @@ app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
   }
 });
 
-// Remove this line since we don’t need to serve index.html from the Web Service
-// app.get('/', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'public', 'index.html'));
-// });
-
+// **Start Server**
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
