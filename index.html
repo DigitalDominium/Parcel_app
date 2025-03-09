@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<script src="https://unpkg.com/html5-qrcode/html5-qrcode.min.js"></script>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -124,10 +125,21 @@
 
       <div id="guard-actions" class="hidden">
         <h3>Log New Parcel</h3>
-        <input id="awbNumber" placeholder="AWB Number" />
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <input id="awbNumber" placeholder="AWB Number" />
+          <button id="scanAWB" onclick="startScanner()">
+            📷
+          </button>
+        </div>
         <input id="recipientName" placeholder="Recipient Name" />
         <input id="recipientUnit" placeholder="Unit Number" />
         <button onclick="logParcel()">Log Parcel</button>
+        
+        <!-- ✅ Hidden Barcode Scanner -->
+        <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
+          <div id="reader" style="width: 100%;"></div>
+          <button onclick="stopScanner()">❌ Close Scanner</button>
+        </div>
       </div>
 
       <div id="resident-actions" class="hidden">
@@ -255,6 +267,37 @@
       token = null;
       document.getElementById('dashboard').classList.add('hidden');
       document.getElementById('login-form').classList.remove('hidden');
+    }
+
+    let token = null;
+    let selectedParcelAWB = null;
+    let scanner = null;
+  
+    function startScanner() {
+      document.getElementById('scanner').classList.remove('hidden');
+  
+      scanner = new Html5QrcodeScanner(
+        "reader", 
+        { fps: 10, qrbox: { width: 250, height: 250 } }, 
+        false
+      );
+  
+      scanner.render(
+        (decodedText) => {
+          document.getElementById('awbNumber').value = decodedText;
+          stopScanner();
+        },
+        (errorMessage) => {
+          console.warn("QR Code scanning error:", errorMessage);
+        }
+      );
+    }
+  
+    function stopScanner() {
+      document.getElementById('scanner').classList.add('hidden');
+      if (scanner) {
+        scanner.clear();
+      }
     }
   </script>
 </body>
