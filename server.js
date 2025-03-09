@@ -82,18 +82,22 @@ app.post('/api/auth/login', async (req, res) => {
 
 // **Retrieve Parcels API (Guards See All, Residents See Their Own)**
 app.get('/api/parcels', authenticateToken, async (req, res) => {
-    const user = req.user;
+    console.log("🟢 Fetching Parcels for User ID:", req.user.id);
 
+    const user = req.user;
     try {
         let result;
         if (user.role === 'guard') {
             result = await client.query('SELECT * FROM parcels'); // ✅ Guards get all parcels
         } else {
-            // ✅ Residents get only their parcels
+            // ✅ Residents only get UNCOLLECTED parcels
             const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
             const unitNumber = userResult.rows[0]?.unit_number;
 
-            result = await client.query('SELECT * FROM parcels WHERE recipient_unit = $1', [unitNumber]);
+            result = await client.query(
+                'SELECT * FROM parcels WHERE recipient_unit = $1 AND collected_at IS NULL',
+                [unitNumber]
+            );
         }
 
         res.json(result.rows);
