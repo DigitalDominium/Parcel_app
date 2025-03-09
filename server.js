@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'))); // Optional, can remove if not needed
 app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' }));
 
 const authenticateToken = (req, res, next) => {
@@ -94,6 +94,9 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
     if (user.role !== 'guard') {
       return res.status(403).json({ msg: 'Only guards can log parcels' });
     }
+    if (!awbNumber || !recipientName || !recipientUnit) {
+      return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
+    }
     const result = await client.query(
       'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
       [awbNumber, recipientName, recipientUnit]
@@ -124,11 +127,12 @@ app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// Remove this line since we don’t need to serve index.html from the Web Service
+// app.get('/', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
