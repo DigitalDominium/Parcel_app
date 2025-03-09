@@ -1,9 +1,10 @@
-require('dotenv').config();
-const express = require('express');
-const { Client } = require('pg'); // Use pg instead of mongoose
-const path = require('path');
-const jwt = require('jsonwebtoken');
-const cors = require('cors'); // Add cors for front-end communication
+import 'dotenv/config'; // Replace require('dotenv').config()
+import express from 'express';
+import { Client } from 'pg'; // Replace require('pg') with import
+import path from 'path';
+import jwt from 'jsonwebtoken';
+import cors from 'cors'; // Add this if not already installed
+
 const app = express();
 
 app.use(express.json()); // To parse JSON bodies
@@ -30,10 +31,6 @@ const client = new Client({
 client.connect()
   .then(() => console.log('Connected to PostgreSQL'))
   .catch(err => console.log('PostgreSQL error:', err));
-
-// Load routes (ensure you have an auth.js file or remove this if not needed yet)
-// const authRoutes = require('./routes/auth');
-// app.use('/api/auth', authRoutes);
 
 // Example API route (replace with your actual routes)
 app.post('/api/auth/register', async (req, res) => {
