@@ -109,12 +109,12 @@ app.get('/api/parcels', authenticateToken, async (req, res) => {
 
 // **Log New Parcel API**
 app.post('/api/parcels', authenticateToken, async (req, res) => {
-    console.log("Received Request Body:", req.body); // Debugging
+    console.log("🟢 Received Request Body:", req.body); // ✅ Debugging
 
     const { awbNumber, recipientName, recipientUnit } = req.body;
 
     if (!awbNumber || !recipientName || !recipientUnit) {
-        console.log("Missing Fields:", { awbNumber, recipientName, recipientUnit }); // Debugging
+        console.log("🔴 Missing Fields:", { awbNumber, recipientName, recipientUnit }); // ✅ Debugging
         return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
     }
 
