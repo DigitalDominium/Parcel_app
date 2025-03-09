@@ -28,19 +28,15 @@ client.connect()
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
 
-  console.log("Received Token:", token); // Debugging Token
-
   if (!token) {
     return res.status(401).json({ msg: 'No token provided' });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
-      console.log("Token Verification Failed:", err);
       return res.status(403).json({ msg: 'Invalid token' });
     }
     req.user = decoded;
-    console.log("Decoded User:", req.user); // Debugging User Info
     next();
   });
 };
@@ -48,7 +44,6 @@ const authenticateToken = (req, res, next) => {
 // **Register API**
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
-  console.log("Register Request Body:", req.body); // Debugging
 
   try {
     await client.query(
@@ -65,7 +60,6 @@ app.post('/api/auth/register', async (req, res) => {
 // **Login API**
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  console.log("Login Request Body:", req.body); // Debugging
 
   try {
     const result = await client.query(
@@ -86,11 +80,33 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// **Retrieve Parcels API**
+// **Retrieve Parcels API (Guards See All, Residents See Their Own)**
+app.get('/api/parcels', authenticateToken, async (req, res) => {
+    const user = req.user;
+
+    try {
+        let result;
+        if (user.role === 'guard') {
+            result = await client.query('SELECT * FROM parcels'); // ✅ Guards get all parcels
+        } else {
+            // ✅ Residents get only their parcels
+            const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
+            const unitNumber = userResult.rows[0]?.unit_number;
+
+            result = await client.query('SELECT * FROM parcels WHERE recipient_unit = $1', [unitNumber]);
+        }
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error retrieving parcels:', err);
+        res.status(500).json({ msg: 'Failed to retrieve parcels' });
+    }
+});
+
+// **Log New Parcel API (Only for Guards)**
 app.post('/api/parcels', authenticateToken, async (req, res) => {
     console.log("🟢 Received Request Body:", req.body);
 
-    // ✅ Correct the variable name to match frontend
     const { awbNumber, recipientName, recipientUnit } = req.body;
 
     if (!awbNumber || !recipientName || !recipientUnit) {
@@ -98,15 +114,14 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
         return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
     }
 
-    const user = req.user;
-    if (user.role !== 'guard') {
+    if (req.user.role !== 'guard') {
         return res.status(403).json({ msg: 'Only guards can log parcels' });
     }
 
     try {
         const result = await client.query(
             'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
-            [awbNumber, recipientName, recipientUnit] // ✅ Use recipientUnit
+            [awbNumber, recipientName, recipientUnit]
         );
         res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
     } catch (err) {
@@ -115,35 +130,7 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
     }
 });
 
-// **Log New Parcel API**
-app.post('/api/parcels', authenticateToken, async (req, res) => {
-    console.log("🟢 Received Request Body:", req.body); // Debugging
-
-    const { awbNumber, recipientName, unitNumber } = req.body; // ✅ Change recipientUnit to unitNumber
-
-    if (!awbNumber || !recipientName || !unitNumber) {
-        console.log("🔴 Missing Fields:", { awbNumber, recipientName, unitNumber }); // ✅ Debugging
-        return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
-    }
-
-    const user = req.user;
-    if (user.role !== 'guard') {
-        return res.status(403).json({ msg: 'Only guards can log parcels' });
-    }
-
-    try {
-        const result = await client.query(
-            'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
-            [awbNumber, recipientName, unitNumber] // ✅ Use unitNumber here
-        );
-        res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
-    } catch (err) {
-        console.error('Error logging parcel:', err);
-        res.status(500).json({ msg: 'Failed to log parcel' });
-    }
-});
-
-// **Collect Parcel API**
+// **Collect Parcel API (Residents Only)**
 app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
   const { awbNumber } = req.body;
   const user = req.user;
