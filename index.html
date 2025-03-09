@@ -121,28 +121,34 @@
     }
 
     async function logParcel() {
-      const awbNumber = document.getElementById('awbNumber').value;
-      const recipientName = document.getElementById('recipientName').value;
-      const unitNumber = document.getElementById('recipientUnit').value;
-
-      const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ awbNumber, recipientName, unitNumber }),
-      });
-      const data = await response.json();
-      if (data.msg === 'Parcel logged successfully') {
-        alert('Parcel Logged in successfully');
-        document.getElementById('awbNumber').value = '';
-        document.getElementById('recipientName').value = '';
-        document.getElementById('recipientUnit').value = '';
-      } else {
-        alert(data.msg);
-      }
+        const awbNumber = document.getElementById('awbNumber').value.trim();
+        const recipientName = document.getElementById('recipientName').value.trim();
+        const unitNumber = document.getElementById('recipientUnit').value.trim();
+    
+        console.log("Debug - Sending Data:", { awbNumber, recipientName, unitNumber }); // Debugging
+    
+        const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Ensure token is valid
+            },
+            body: JSON.stringify({ awbNumber, recipientName, unitNumber }),
+        });
+    
+        const data = await response.json();
+        console.log("Debug - Response Data:", data); // Debugging
+    
+        if (data.msg === 'Parcel logged successfully') {
+            alert('Parcel logged successfully');
+            document.getElementById('awbNumber').value = '';
+            document.getElementById('recipientName').value = '';
+            document.getElementById('recipientUnit').value = '';
+        } else {
+            alert(data.msg);
+        }
     }
+
 
     async function loadParcels() {
       const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
