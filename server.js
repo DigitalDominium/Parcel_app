@@ -87,24 +87,32 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // **Retrieve Parcels API**
-app.get('/api/parcels', authenticateToken, async (req, res) => {
-  console.log("User Role:", req.user.role); // Debugging Role
-  const user = req.user;
+app.post('/api/parcels', authenticateToken, async (req, res) => {
+    console.log("🟢 Received Request Body:", req.body);
 
-  try {
-    let result;
-    if (user.role === 'guard') {
-      result = await client.query('SELECT * FROM parcels');
-    } else {
-      const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
-      const unitNumber = userResult.rows[0]?.unit_number;
-      result = await client.query('SELECT * FROM parcels WHERE recipient_unit = $1', [unitNumber]);
+    // ✅ Correct the variable name to match frontend
+    const { awbNumber, recipientName, recipientUnit } = req.body;
+
+    if (!awbNumber || !recipientName || !recipientUnit) {
+        console.log("🔴 Missing Fields:", { awbNumber, recipientName, recipientUnit });
+        return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
     }
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error retrieving parcels:', err);
-    res.status(500).json({ msg: 'Failed to retrieve parcels' });
-  }
+
+    const user = req.user;
+    if (user.role !== 'guard') {
+        return res.status(403).json({ msg: 'Only guards can log parcels' });
+    }
+
+    try {
+        const result = await client.query(
+            'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
+            [awbNumber, recipientName, recipientUnit] // ✅ Use recipientUnit
+        );
+        res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
+    } catch (err) {
+        console.error('Error logging parcel:', err);
+        res.status(500).json({ msg: 'Failed to log parcel' });
+    }
 });
 
 // **Log New Parcel API**
