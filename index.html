@@ -121,10 +121,10 @@
     }
   
     async function logParcel() {
-      const awbNumber = document.getElementById('awb-number').value;
-      const recipientName = document.getElementById('recipient-name').value;
-      const unitNumber = document.getElementById('recipient-unit').value;
-  
+      const awbNumber = document.getElementById('awbNumber').value;
+      const recipientName = document.getElementById('recipientName').value;
+      const unitNumber = document.getElementById('recipientUnit').value;
+    
       const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
         method: 'POST',
         headers: { 
@@ -136,9 +136,9 @@
       const data = await response.json();
       if (data.msg === 'Parcel logged successfully') {
         alert('Parcel Logged in successfully');
-        document.getElementById('awb-number').value = '';
-        document.getElementById('recipient-name').value = '';
-        document.getElementById('recipient-unit').value = '';
+        document.getElementById('awbNumber').value = '';
+        document.getElementById('recipientName').value = '';
+        document.getElementById('recipientUnit').value = '';
       } else {
         alert(data.msg);
       }
