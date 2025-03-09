@@ -109,12 +109,12 @@ app.get('/api/parcels', authenticateToken, async (req, res) => {
 
 // **Log New Parcel API**
 app.post('/api/parcels', authenticateToken, async (req, res) => {
-    console.log("🟢 Received Request Body:", req.body); // ✅ Debugging
+    console.log("🟢 Received Request Body:", req.body); // Debugging
 
-    const { awbNumber, recipientName, recipientUnit } = req.body;
+    const { awbNumber, recipientName, unitNumber } = req.body; // ✅ Change recipientUnit to unitNumber
 
-    if (!awbNumber || !recipientName || !recipientUnit) {
-        console.log("🔴 Missing Fields:", { awbNumber, recipientName, recipientUnit }); // ✅ Debugging
+    if (!awbNumber || !recipientName || !unitNumber) {
+        console.log("🔴 Missing Fields:", { awbNumber, recipientName, unitNumber }); // ✅ Debugging
         return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
     }
 
@@ -126,7 +126,7 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
     try {
         const result = await client.query(
             'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
-            [awbNumber, recipientName, recipientUnit]
+            [awbNumber, recipientName, unitNumber] // ✅ Use unitNumber here
         );
         res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
     } catch (err) {
