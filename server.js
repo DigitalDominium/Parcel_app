@@ -1,12 +1,14 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
+const { Client } = require('pg'); // Use pg instead of mongoose
 const path = require('path');
 const jwt = require('jsonwebtoken');
+const cors = require('cors'); // Add cors for front-end communication
 const app = express();
 
 app.use(express.json()); // To parse JSON bodies
 app.use(express.static(path.join(__dirname, 'public'))); // Serve static files
+app.use(cors({ origin: 'https://your-static-site-url.onrender.com' })); // Replace with your Static Site URL
 
 // Middleware to verify JWT token
 const authenticateToken = (req, res, next) => {
@@ -20,16 +22,32 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.log('MongoDB error:', err));
+// Initialize PostgreSQL client
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+client.connect()
+  .then(() => console.log('Connected to PostgreSQL'))
+  .catch(err => console.log('PostgreSQL error:', err));
 
-// Load routes
-const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
+// Load routes (ensure you have an auth.js file or remove this if not needed yet)
+// const authRoutes = require('./routes/auth');
+// app.use('/api/auth', authRoutes);
 
-// Protect parcel routes with authentication
-app.use('/api/parcels', authenticateToken, authRoutes);
+// Example API route (replace with your actual routes)
+app.post('/api/auth/register', async (req, res) => {
+  const { name, unitNumber, email, password } = req.body;
+  try {
+    await client.query(
+      'INSERT INTO users (name, unit_number, email, password) VALUES ($1, $2, $3, $4)',
+      [name, unitNumber, email, password] // Use bcrypt for password hashing in production
+    );
+    res.json({ msg: 'Registration successful' });
+  } catch (err) {
+    res.status(500).json({ msg: 'Registration failed' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
