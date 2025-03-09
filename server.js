@@ -109,29 +109,30 @@ app.get('/api/parcels', authenticateToken, async (req, res) => {
 
 // **Log New Parcel API**
 app.post('/api/parcels', authenticateToken, async (req, res) => {
-  console.log("Parcel Logging Request Body:", req.body); // Debugging
-  
-  const { awbNumber, recipientName, recipientUnit } = req.body;
-  const user = req.user;
+    console.log("Received Request Body:", req.body); // Debugging
 
-  if (user.role !== 'guard') {
-    return res.status(403).json({ msg: 'Only guards can log parcels' });
-  }
-  
-  if (!awbNumber || !recipientName || !recipientUnit) {
-    return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
-  }
+    const { awbNumber, recipientName, recipientUnit } = req.body;
 
-  try {
-    const result = await client.query(
-      'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
-      [awbNumber, recipientName, recipientUnit]
-    );
-    res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
-  } catch (err) {
-    console.error('Error logging parcel:', err);
-    res.status(500).json({ msg: 'Failed to log parcel' });
-  }
+    if (!awbNumber || !recipientName || !recipientUnit) {
+        console.log("Missing Fields:", { awbNumber, recipientName, recipientUnit }); // Debugging
+        return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
+    }
+
+    const user = req.user;
+    if (user.role !== 'guard') {
+        return res.status(403).json({ msg: 'Only guards can log parcels' });
+    }
+
+    try {
+        const result = await client.query(
+            'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
+            [awbNumber, recipientName, recipientUnit]
+        );
+        res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
+    } catch (err) {
+        console.error('Error logging parcel:', err);
+        res.status(500).json({ msg: 'Failed to log parcel' });
+    }
 });
 
 // **Collect Parcel API**
