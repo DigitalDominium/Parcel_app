@@ -1,16 +1,20 @@
 import 'dotenv/config';
 import express from 'express';
-import pg from 'pg'; // Updated import
-const { Client } = pg; // Extract Client from the default export
+import pg from 'pg';
+const { Client } = pg;
 import path from 'path';
+import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' })); // Replace with your Static Site URL
+app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' })); // Updated with your Static Site URL
 
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
