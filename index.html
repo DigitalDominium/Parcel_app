@@ -216,9 +216,9 @@
     }
 
     async function logParcel() {
-        const awbNumber = document.getElementById('awbNumber').value;
-        const recipientName = document.getElementById('recipientName').value;
-        const recipientUnit = document.getElementById('recipientUnit').value;
+        const awbNumber = document.getElementById('awbNumber').value.trim();
+        const recipientName = document.getElementById('recipientName').value.trim();
+        const recipientUnit = document.getElementById('recipientUnit').value.trim();
     
         // Basic validation to ensure fields are not empty
         if (!awbNumber || !recipientName || !recipientUnit) {
@@ -241,17 +241,22 @@
             });
     
             const data = await response.json();
-            alert(data.msg);
     
-            // Clear the form after successful logging
+            // Handle the response based on status
             if (response.ok) {
+                alert(data.msg || 'Parcel logged successfully');
+                // Clear the form after successful logging
                 document.getElementById('awbNumber').value = '';
                 document.getElementById('recipientName').value = '';
                 document.getElementById('recipientUnit').value = '';
+            } else if (response.status === 409) { // Conflict status for duplicate AWB
+                alert('Error: This AWB number is already logged. Please use a unique AWB number.');
+            } else {
+                alert(`Error: ${data.msg || 'Failed to log parcel. Please try again.'}`);
             }
         } catch (error) {
             console.error('Error logging parcel:', error);
-            alert('Failed to log parcel. Please try again.');
+            alert('An unexpected error occurred. Please try again.');
         }
     }
 
