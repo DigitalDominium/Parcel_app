@@ -124,12 +124,19 @@ app.post('/api/parcels', authenticateToken, async (req, res) => {
 
     try {
         const result = await client.query(
-            'INSERT INTO parcels (awb_number, recipient_name, recipient_unit) VALUES ($1, $2, $3) RETURNING *',
+            'INSERT INTO parcels (awb_number, recipient_name, recipient_unit, delivered_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *',
             [awbNumber, recipientName, recipientUnit]
         );
         res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
     } catch (err) {
         console.error('Error logging parcel:', err);
+
+        // Check for unique constraint violation (PostgreSQL error code 23505)
+        if (err.code === '23505' && err.constraint === 'unique_awb_number') {
+            return res.status(409).json({ msg: 'AWB number already exists. Please use a unique AWB number.' });
+        }
+
+        // Handle other errors
         res.status(500).json({ msg: 'Failed to log parcel' });
     }
 });
