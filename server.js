@@ -109,35 +109,27 @@ app.get('/api/parcels', authenticateToken, async (req, res) => {
 
 // **Log New Parcel API (Only for Guards)**
 app.post('/api/parcels', authenticateToken, async (req, res) => {
-    console.log("🟢 Received Request Body:", req.body);
-
     const { awbNumber, recipientName, recipientUnit } = req.body;
 
-    if (!awbNumber || !recipientName || !recipientUnit) {
-        console.log("🔴 Missing Fields:", { awbNumber, recipientName, recipientUnit });
-        return res.status(400).json({ msg: 'All fields (AWB Number, Recipient Name, Recipient Unit) are required' });
-    }
-
-    if (req.user.role !== 'guard') {
-        return res.status(403).json({ msg: 'Only guards can log parcels' });
-    }
-
     try {
+        // Check if AWB number already exists
+        const checkResult = await client.query('SELECT * FROM parcels WHERE awb_number = $1', [awbNumber]);
+
+        if (checkResult.rows.length > 0) {
+            return res.status(409).json({ msg: 'Error: This AWB number is already logged.' });
+        }
+
+        // Insert new parcel if AWB does not exist
         const result = await client.query(
             'INSERT INTO parcels (awb_number, recipient_name, recipient_unit, delivered_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *',
             [awbNumber, recipientName, recipientUnit]
         );
+
         res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
+
     } catch (err) {
         console.error('Error logging parcel:', err);
-
-        // Check for unique constraint violation (PostgreSQL error code 23505)
-        if (err.code === '23505' && err.constraint === 'unique_awb_number') {
-            return res.status(409).json({ msg: 'AWB number already exists. Please use a unique AWB number.' });
-        }
-
-        // Handle other errors
-        res.status(500).json({ msg: 'Failed to log parcel' });
+        res.status(500).json({ msg: 'Failed to log parcel. Please try again.' });
     }
 });
 
