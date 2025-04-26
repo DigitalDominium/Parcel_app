@@ -1,3 +1,126 @@
+<!DOCTYPE html>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Parcel App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    #app {
+      max-width: 600px;
+      width: 100%;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    h1, h2, h3, h4 {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    input, select, button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #parcels-list div, #admin-parcels-list div, #admin-users-list div {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    #parcels-list div.selected, #admin-parcels-list div.selected {
+      background: #d1e7fd;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      #app {
+        width: 90%;
+        padding: 15px;
+      }
+      
+      input, button {
+        padding: 10px;
+        font-size: 14px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      h2, h3, h4 {
+        font-size: 18px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #app {
+        width: 95%;
+        padding: 10px;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      h2, h3, h4 {
+        font-size: 16px;
+      }
+
+      input, button {
+        padding: 8px;
+        font-size: 12px;
+      }
+
+      #parcels-list div, #admin-parcels-list div, #admin-users-list div {
+        padding: 8px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
 <body>
   <div id="app">
     <h1>Parcel Management</h1>
@@ -75,7 +198,7 @@
       document.getElementById('guard-actions').classList.add('hidden');
       document.getElementById('resident-actions').classList.add('hidden');
       document.getElementById('admin-actions').classList.add('hidden');
-      document.getElementById('scanner').classList.add('hidden'); // Ensure scanner starts hidden
+      document.getElementById('scanner').classList.add('hidden');
     }
 
     function showRegister() {
@@ -288,7 +411,6 @@
     let token = null;
     let selectedParcelAWB = null;
 
-    // Barcode Scanner Functions
     let startScanner;
     let stopScanner;
 
@@ -299,7 +421,6 @@
       }
       console.log("🟢 QuaggaJS loaded successfully");
 
-      // Ensure initial state: only login form visible
       hideAllSections();
       hideDashboardSections();
       document.getElementById('login-form').classList.remove('hidden');
@@ -356,3 +477,4 @@
     });
   </script>
 </body>
+</html>
