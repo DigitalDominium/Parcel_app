@@ -2,18 +2,13 @@ import 'dotenv/config';
 import express from 'express';
 import pg from 'pg';
 const { Client } = pg;
-import path from 'path';
-import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
 app.use(express.json());
-app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' })); 
+app.use(cors({ origin: 'https://parcel-app-7mbi.onrender.com' }));
 
 // Database Connection
 const client = new Client({
@@ -27,7 +22,6 @@ client.connect()
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
-
   if (!token) {
     return res.status(401).json({ msg: 'No token provided' });
   }
@@ -41,14 +35,27 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Role-Based Middleware
+const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ msg: `Access restricted to ${roles.join(', ')} roles` });
+    }
+    next();
+  };
+};
+
 // **Register API**
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
 
   try {
+    // Determine role: admin for specific email, guard if unitNumber is 'N/A', otherwise resident
+    const role = email === 'admin@example.com' ? 'admin' : (unitNumber === 'N/A' ? 'guard' : 'resident');
+
     await client.query(
       'INSERT INTO users (name, unit_number, email, password, role) VALUES ($1, $2, $3, $4, $5)',
-      [name, unitNumber, email, password, 'resident']
+      [name, unitNumber, email, password, role]
     );
     res.json({ msg: 'Registration successful' });
   } catch (err) {
@@ -69,8 +76,8 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (result.rows.length > 0) {
       const user = result.rows[0];
-      const token = jwt.sign({ id: user.id, role: user.role || 'resident' }, process.env.JWT_SECRET, { expiresIn: '1h' });
-      res.json({ token, role: user.role || 'resident' });
+      const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      res.json({ token, role: user.role });
     } else {
       res.status(401).json({ msg: 'Invalid email or password' });
     }
@@ -80,61 +87,87 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// **Retrieve Parcels API (Guards See All, Residents See Their Own)**
-app.get('/api/parcels', authenticateToken, async (req, res) => {
-    console.log("🟢 Fetching Parcels for User ID:", req.user.id);
-
-    const user = req.user;
-    try {
-        let result;
-        if (user.role === 'guard') {
-            result = await client.query('SELECT * FROM parcels'); // ✅ Guards get all parcels
-        } else {
-            // ✅ Residents only get UNCOLLECTED parcels
-            const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
-            const unitNumber = userResult.rows[0]?.unit_number;
-
-            result = await client.query(
-                'SELECT * FROM parcels WHERE recipient_unit = $1 AND collected_at IS NULL',
-                [unitNumber]
-            );
-        }
-
-        res.json(result.rows);
-    } catch (err) {
-        console.error('Error retrieving parcels:', err);
-        res.status(500).json({ msg: 'Failed to retrieve parcels' });
-    }
+// **Admin Routes**
+// Get all users (admin only)
+app.get('/api/admin/users', authenticateToken, restrictTo('admin'), async (req, res) => {
+  try {
+    const result = await client.query('SELECT id, name, email, unit_number, role FROM users');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error retrieving users:', err);
+    res.status(500).json({ msg: 'Failed to retrieve users' });
+  }
 });
 
-// **Log New Parcel API (Only for Guards)**
-app.post('/api/parcels', authenticateToken, async (req, res) => {
-    const { awbNumber, recipientName, recipientUnit } = req.body;
-
-    try {
-        // Check if AWB number already exists
-        const checkResult = await client.query('SELECT * FROM parcels WHERE awb_number = $1', [awbNumber]);
-
-        if (checkResult.rows.length > 0) {
-            return res.status(409).json({ msg: 'Error: This AWB number is already logged.' });
-        }
-
-        // Insert new parcel if AWB does not exist
-        const result = await client.query(
-            'INSERT INTO parcels (awb_number, recipient_name, recipient_unit, delivered_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *',
-            [awbNumber, recipientName, recipientUnit]
-        );
-
-        res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
-
-    } catch (err) {
-        console.error('Error logging parcel:', err);
-        res.status(500).json({ msg: 'Failed to log parcel. Please try again.' });
+// Delete a parcel (admin only)
+app.delete('/api/admin/parcels/:awbNumber', authenticateToken, restrictTo('admin'), async (req, res) => {
+  const { awbNumber } = req.params;
+  try {
+    const result = await client.query('DELETE FROM parcels WHERE awb_number = $1 RETURNING *', [awbNumber]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: 'Parcel not found' });
     }
+    // Log admin action
+    await client.query('INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, $2, $3)', [
+      req.user.id,
+      'DELETE_PARCEL',
+      `Deleted parcel with AWB ${awbNumber}`
+    ]);
+    res.json({ msg: 'Parcel deleted' });
+  } catch (err) {
+    console.error('Error deleting parcel:', err);
+    res.status(500).json({ msg: 'Failed to delete parcel' });
+  }
+});
+
+// **Retrieve Parcels API (Admins see all, Guards see all, Residents see their own uncollected)**
+app.get('/api/parcels', authenticateToken, async (req, res) => {
+  console.log("🟢 Fetching Parcels for User ID:", req.user.id);
+
+  const user = req.user;
+  try {
+    let result;
+    if (user.role === 'admin' || user.role === 'guard') {
+      result = await client.query('SELECT * FROM parcels'); // Admins and guards see all parcels
+    } else {
+      const userResult = await client.query('SELECT unit_number FROM users WHERE id = $1', [user.id]);
+      const unitNumber = userResult.rows[0]?.unit_number;
+      result = await client.query(
+        'SELECT * FROM parcels WHERE recipient_unit = $1 AND collected_at IS NULL',
+        [unitNumber]
+      );
+    }
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error retrieving parcels:', err);
+    res.status(500).json({ msg: 'Failed to retrieve parcels' });
+  }
+});
+
+// **Log New Parcel API (Guards and Admins Only)**
+app.post('/api/parcels', authenticateToken, restrictTo('guard', 'admin'), async (req, res) => {
+  const { awbNumber, recipientName, recipientUnit } = req.body;
+
+  try {
+    const checkResult = await client.query('SELECT * FROM parcels WHERE awb_number = $1', [awbNumber]);
+    if (checkResult.rows.length > 0) {
+      return res.status(409).json({ msg: 'Error: This AWB number is already logged.' });
+    }
+
+    const result = await client.query(
+      'INSERT INTO parcels (awb_number, recipient_name, recipient_unit, delivered_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *',
+      [awbNumber, recipientName, recipientUnit]
+    );
+
+    res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
+  } catch (err) {
+    console.error('Error logging parcel:', err);
+    res.status(500).json({ msg: 'Failed to log parcel. Please try again.' });
+  }
 });
 
 // **Collect Parcel API (Residents Only)**
-app.post('/api/parcels/collect', authenticateToken, async (req, res) => {
+app.post('/api/parcels/collect', authenticateToken, restrictTo('resident'), async (req, res) => {
   const { awbNumber } = req.body;
   const user = req.user;
 
