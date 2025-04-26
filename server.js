@@ -50,9 +50,8 @@ app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
 
   try {
-    // Determine role: admin for specific email, guard if unitNumber is 'N/A', otherwise resident
     const role = email === 'admin@example.com' ? 'admin' : (unitNumber === 'N/A' ? 'guard' : 'resident');
-
+    
     await client.query(
       'INSERT INTO users (name, unit_number, email, password, role) VALUES ($1, $2, $3, $4, $5)',
       [name, unitNumber, email, password, role]
@@ -60,7 +59,11 @@ app.post('/api/auth/register', async (req, res) => {
     res.json({ msg: 'Registration successful' });
   } catch (err) {
     console.error('Error registering user:', err);
-    res.status(500).json({ msg: 'Registration failed' });
+    if (err.code === '23505') { // PostgreSQL unique constraint violation
+      res.status(409).json({ msg: 'Email already exists' });
+    } else {
+      res.status(500).json({ msg: 'Registration failed' });
+    }
   }
 });
 
