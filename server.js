@@ -80,7 +80,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
       const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-      res.json({ token, role: user.role });
+      res.json({ token, role: user.role, name: user.name }); // Add name to response
     } else {
       res.status(401).json({ msg: 'Invalid email or password' });
     }
