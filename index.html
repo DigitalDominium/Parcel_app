@@ -63,13 +63,28 @@
   </div>
 
   <script>
-    function showRegister() {
+    // Function to hide all top-level sections
+    function hideAllSections() {
       document.getElementById('login-form').classList.add('hidden');
+      document.getElementById('register-form').classList.add('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+    }
+
+    // Function to hide all dashboard sub-sections
+    function hideDashboardSections() {
+      document.getElementById('guard-actions').classList.add('hidden');
+      document.getElementById('resident-actions').classList.add('hidden');
+      document.getElementById('admin-actions').classList.add('hidden');
+      document.getElementById('scanner').classList.add('hidden'); // Ensure scanner starts hidden
+    }
+
+    function showRegister() {
+      hideAllSections();
       document.getElementById('register-form').classList.remove('hidden');
     }
 
     function showLogin() {
-      document.getElementById('register-form').classList.add('hidden');
+      hideAllSections();
       document.getElementById('login-form').classList.remove('hidden');
     }
 
@@ -106,23 +121,18 @@
 
       if (data.token) {
         token = data.token;
-        document.getElementById('login-form').classList.add('hidden');
+        hideAllSections();
         document.getElementById('dashboard').classList.remove('hidden');
         document.getElementById('user-name').textContent = email;
 
+        hideDashboardSections();
         if (data.role === 'guard') {
           document.getElementById('guard-actions').classList.remove('hidden');
-          document.getElementById('resident-actions').classList.add('hidden');
-          document.getElementById('admin-actions').classList.add('hidden');
         } else if (data.role === 'resident') {
           document.getElementById('resident-actions').classList.remove('hidden');
-          document.getElementById('guard-actions').classList.add('hidden');
-          document.getElementById('admin-actions').classList.add('hidden');
           loadParcels();
         } else if (data.role === 'admin') {
           document.getElementById('admin-actions').classList.remove('hidden');
-          document.getElementById('guard-actions').classList.add('hidden');
-          document.getElementById('resident-actions').classList.add('hidden');
           loadUsers();
           loadParcels();
         }
@@ -182,7 +192,6 @@
       const parcelsList = document.getElementById('parcels-list');
       const adminParcelsList = document.getElementById('admin-parcels-list');
       
-      // Clear both lists
       parcelsList.innerHTML = '';
       if (adminParcelsList) adminParcelsList.innerHTML = '';
 
@@ -199,7 +208,6 @@
         div.dataset.awbNumber = parcel.awb_number;
         div.onclick = () => selectParcel(div);
 
-        // Add to resident or admin list based on role
         if (document.getElementById('resident-actions').classList.contains('hidden')) {
           if (adminParcelsList) adminParcelsList.appendChild(div.cloneNode(true));
         } else {
@@ -272,17 +280,15 @@
     function logout() {
       token = null;
       selectedParcelAWB = null;
-      document.getElementById('dashboard').classList.add('hidden');
+      hideAllSections();
+      hideDashboardSections();
       document.getElementById('login-form').classList.remove('hidden');
-      document.getElementById('guard-actions').classList.add('hidden');
-      document.getElementById('resident-actions').classList.add('hidden');
-      document.getElementById('admin-actions').classList.add('hidden');
     }
 
     let token = null;
     let selectedParcelAWB = null;
 
-    // Barcode Scanner Functions (unchanged)
+    // Barcode Scanner Functions
     let startScanner;
     let stopScanner;
 
@@ -292,6 +298,11 @@
         return;
       }
       console.log("🟢 QuaggaJS loaded successfully");
+
+      // Ensure initial state: only login form visible
+      hideAllSections();
+      hideDashboardSections();
+      document.getElementById('login-form').classList.remove('hidden');
 
       startScanner = function () {
         console.log("🟢 startScanner called");
