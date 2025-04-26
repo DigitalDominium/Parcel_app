@@ -212,21 +212,39 @@
     }
 
     async function register() {
+      console.log("🟢 register() called"); // Debug: Confirm function is triggered
+    
       const name = document.getElementById('name').value;
       const unitNumber = document.getElementById('unit').value;
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-
-      const response = await fetch('https://parcel-manager-backend.onrender.com/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, unitNumber, email, password }),
-      });
-
-      const data = await response.json();
-      alert(data.msg);
-      if (data.msg === 'Registration successful') {
-        showLogin();
+    
+      console.log("🟢 Form Data:", { name, unitNumber, email, password }); // Debug: Log form data
+    
+      if (!name || !unitNumber || !email || !password) {
+        alert('Please fill in all fields.');
+        return;
+      }
+    
+      try {
+        const response = await fetch('https://parcel-manager-backend.onrender.com/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, unitNumber, email, password }),
+        });
+    
+        console.log("🟢 Fetch Response Status:", response.status); // Debug: Log response status
+    
+        const data = await response.json();
+        console.log("🟢 Response Data:", data); // Debug: Log response data
+    
+        alert(data.msg);
+        if (data.msg === 'Registration successful') {
+          showLogin();
+        }
+      } catch (error) {
+        console.error("❌ Error during registration:", error); // Debug: Log errors
+        alert('Failed to register. Please try again.');
       }
     }
 
