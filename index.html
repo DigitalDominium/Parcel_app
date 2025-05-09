@@ -170,7 +170,7 @@
       <div id="resident-actions" class="hidden">
         <h3>Your Parcels</h3>
         <div id="parcels-list"></div>
-        <button onclick="collectParcel()">Collect Parcel</button>
+        <button onclick="startParcelScan()">Collect Parcel</button>
       </div>
 
       <!-- Admin Dashboard -->
@@ -513,6 +513,29 @@
       document.getElementById('scanAWB').addEventListener('click', startScanner);
       document.querySelector('#scanner button').addEventListener('click', stopScanner);
     });
+
+    function startParcelScan() {
+      if (!selectedParcelAWB) {
+        alert("Please select a parcel first.");
+        return;
+      }
+    
+      document.getElementById('scanner').classList.remove('hidden');
+      startScanner();
+    
+      Quagga.offDetected(); // clear previous handlers
+      Quagga.onDetected(function (result) {
+        const scannedCode = result.codeResult.code;
+        console.log("Scanned code:", scannedCode);
+    
+        if (scannedCode === selectedParcelAWB) {
+          stopScanner();
+          confirmParcelCollection(); // only confirm if matched
+        } else {
+          alert("❌ Wrong parcel scanned. Please scan the correct barcode.");
+        }
+      });
+    }
   </script>
 </body>
 </html>
