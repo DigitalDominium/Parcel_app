@@ -469,7 +469,14 @@
 
       startScanner = function (onDetectedCallback) {
         console.log("🟢 startScanner called");
-        document.getElementById('scanner').classList.remove('hidden');
+        
+        const scannerContainer = document.getElementById('scanner');
+        const reader = document.getElementById('reader');
+      
+        // Clear previous canvas/video
+        reader.innerHTML = "";
+      
+        scannerContainer.classList.remove('hidden');
       
         Quagga.init({
           inputStream: {
@@ -479,13 +486,13 @@
               height: 480,
               facingMode: "environment"
             },
-            target: document.getElementById("reader")
+            target: reader
           },
           locator: {
             patchSize: "medium",
             halfSample: true
           },
-          numOfWorkers: 4,
+          numOfWorkers: 2,
           locate: true,
           decoder: {
             readers: ["code_128_reader", "ean_reader", "upc_reader"]
@@ -493,13 +500,14 @@
         }, function (err) {
           if (err) {
             console.error("❌ Quagga init error:", err);
+            alert("Camera init failed: " + err.message);
             return;
           }
           console.log("🟢 Quagga initialized successfully");
           Quagga.start();
         });
       
-        Quagga.offDetected(); // remove previous listeners
+        Quagga.offDetected(); // Remove any previous listeners
         Quagga.onDetected(onDetectedCallback);
       };
 
