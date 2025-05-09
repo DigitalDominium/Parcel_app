@@ -463,10 +463,10 @@
       hideDashboardSections();
       document.getElementById('login-form').classList.remove('hidden');
 
-      startScanner = function () {
+      startScanner = function (onDetectedCallback) {
         console.log("🟢 startScanner called");
         document.getElementById('scanner').classList.remove('hidden');
-
+      
         Quagga.init({
           inputStream: {
             type: "LiveStream",
@@ -494,14 +494,9 @@
           console.log("🟢 Quagga initialized successfully");
           Quagga.start();
         });
-
-        Quagga.onDetected(function (result) {
-          console.log("🟢 Barcode detected:", result);
-          let barcode = result.codeResult.code;
-          console.log("🟢 Barcode value:", barcode);
-          document.getElementById('awbNumber').value = barcode;
-          stopScanner();
-        });
+      
+        Quagga.offDetected(); // remove previous listeners
+        Quagga.onDetected(onDetectedCallback);
       };
 
       stopScanner = function () {
@@ -510,7 +505,14 @@
         document.getElementById('scanner').classList.add('hidden');
       };
 
-      document.getElementById('scanAWB').addEventListener('click', startScanner);
+      document.getElementById('scanAWB').addEventListener('click', function () {
+        startScanner(function (result) {
+          const barcode = result.codeResult.code;
+          console.log("🟢 Barcode value:", barcode);
+          document.getElementById('awbNumber').value = barcode;
+          stopScanner();
+        });
+      });
       document.querySelector('#scanner button').addEventListener('click', stopScanner);
     });
 
@@ -520,17 +522,13 @@
         return;
       }
     
-      document.getElementById('scanner').classList.remove('hidden');
-      startScanner();
-    
-      Quagga.offDetected(); // clear previous handlers
-      Quagga.onDetected(function (result) {
+      startScanner(function (result) {
         const scannedCode = result.codeResult.code;
         console.log("Scanned code:", scannedCode);
     
         if (scannedCode === selectedParcelAWB) {
           stopScanner();
-          confirmParcelCollection(); // only confirm if matched
+          confirmParcelCollection();
         } else {
           alert("❌ Wrong parcel scanned. Please scan the correct barcode.");
         }
