@@ -371,13 +371,31 @@
         alert("Please select a parcel first.");
         return;
       }
+  
+      // Show scanner and wait for barcode scan
+      document.getElementById('scanner').classList.remove('hidden');
+  
+      Quagga.offDetected(); // prevent stacking handlers
+      Quagga.onDetected(function (result) {
+        const scannedCode = result.codeResult.code;
+        console.log("Scanned code:", scannedCode);
+  
+        if (scannedCode === selectedParcelAWB) {
+          stopScanner();
+          confirmParcelCollection(); // call original collection handler
+        } else {
+          alert("❌ Wrong parcel scanned. Please scan the correct barcode.");
+        }
+      });
+    }
 
+    async function confirmParcelCollection() {
       const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels/collect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ awbNumber: selectedParcelAWB }),
       });
-
+  
       const data = await response.json();
       alert(data.msg);
       loadParcels();
