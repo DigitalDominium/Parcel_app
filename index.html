@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Parcel App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -29,6 +30,16 @@
       object-fit: cover;
       z-index: 1;
       display: block !important;
+    }
+
+    #reader canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 2;
+      display: none;
     }
 
     body {
@@ -474,21 +485,14 @@
     let selectedParcelAWB = null;
     let startScanner;
     let stopScanner;
-    let barcodeDetector;
-    let scanningInterval;
 
     document.addEventListener("DOMContentLoaded", function () {
-      if (!('BarcodeDetector' in window)) {
-        console.error("❌ BarcodeDetector API not supported in this browser.");
-        alert("Barcode scanning is not supported in this browser. Please use a modern browser like Chrome, Edge, or Safari 15+.");
+      if (typeof Quagga === "undefined") {
+        console.error("❌ Quagga2 failed to load.");
+        alert("Barcode scanner library failed to load.");
         return;
       }
-
-      barcodeDetector = new BarcodeDetector({
-        formats: ['code_128', 'ean_13', 'upc_a', 'upc_e']
-      });
-
-      console.log("🟢 BarcodeDetector initialized successfully");
+      console.log("🟢 Quagga2 loaded successfully");
 
       hideAllSections();
       hideDashboardSections();
@@ -509,69 +513,63 @@
         console.log("🟢 Scanner container styles:", window.getComputedStyle(scannerContainer));
         console.log("🟢 Reader styles:", window.getComputedStyle(reader));
 
-        const video = document.createElement('video');
-        video.setAttribute('playsinline', '');
-        video.style.width = '100%';
-        video.style.height = '100%';
-        video.style.display = 'block';
-        reader.appendChild(video);
-
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 640 },
-              height: { ideal: 480 },
-              facingMode: 'environment'
-            }
+          await Quagga.init({
+            inputStream: {
+              name: "Live",
+              type: "LiveStream",
+              target: reader,
+              constraints: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: "environment"
+              }
+            },
+            decoder: {
+              readers: ["code_128_reader", "ean_reader", "upc_reader"],
+              multiple: false
+            },
+            locate: true
           });
 
-          video.srcObject = stream;
-          console.log("🟢 Video stream attached");
+          console.log("🟢 Quagga2 initialized successfully");
+          Quagga.start();
 
           setTimeout(() => {
-            const videoElement = reader.querySelector('video');
-            if (!videoElement || !videoElement.srcObject) {
-              console.error("❌ Video stream not found");
-              alert("Camera stream failed to load.");
+            const video = reader.querySelector('video');
+            if (!video) {
+              console.error("❌ No video element found in #reader");
+              alert("Camera stream failed to load: Video element not found.");
               stopScanner();
               return;
             }
-            console.log("🟢 Video element found:", videoElement);
+            if (!video.srcObject) {
+              console.error("❌ Video stream not found");
+              alert("Camera stream failed to load: No stream attached.");
+              stopScanner();
+              return;
+            }
+            console.log("🟢 Video element found:", video);
             console.log("🟢 Video stream active");
-            console.log("🟢 Video styles:", window.getComputedStyle(videoElement));
+            console.log("🟢 Video styles:", window.getComputedStyle(video));
           }, 1000);
 
-          const detectBarcodes = async () => {
-            try {
-              const barcodes = await barcodeDetector.detect(video);
-              if (barcodes.length > 0) {
-                const barcode = barcodes[0];
-                console.log("🟢 Barcode detected:", barcode.rawValue);
-                onDetectedCallback({ codeResult: { code: barcode.rawValue } });
-              }
-            } catch (err) {
-              console.error("❌ Barcode detection error:", err);
+          Quagga.onDetected((result) => {
+            if (result && result.codeResult && result.codeResult.code) {
+              onDetectedCallback(result);
             }
-          };
-
-          scanningInterval = setInterval(detectBarcodes, 500);
+          });
         } catch (err) {
-          console.error("❌ Camera access error:", err);
-          alert("Failed to access camera: " + err.message);
+          console.error("❌ Quagga2 init error:", err);
+          alert("Camera initialization failed: " + err.message);
           scannerContainer.classList.add('hidden');
         }
       };
 
       stopScanner = function () {
         console.log("🟢 stopScanner called");
-        clearInterval(scanningInterval);
-        const video = document.getElementById('reader').querySelector('video');
-        if (video && video.srcObject) {
-          const stream = video.srcObject;
-          const tracks = stream.getTracks();
-          tracks.forEach(track => track.stop());
-          video.srcObject = null;
-        }
+        Quagga.stop();
+        Quagga.offDetected();
         document.getElementById('scanner').classList.add('hidden');
         document.getElementById('manualAWB').value = '';
       };
