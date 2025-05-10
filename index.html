@@ -94,7 +94,19 @@
     }
 
     #scanner {
-      z-index: 10; /* Ensure scanner is above other elements */
+      z-index: 10;
+    }
+
+    .button-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .camera-button {
+      width: auto;
+      padding: 12px;
+      font-size: 16px;
     }
 
     @media (max-width: 768px) {
@@ -114,6 +126,11 @@
 
       h2, h3, h4 {
         font-size: 18px;
+      }
+
+      .camera-button {
+        padding: 10px;
+        font-size: 14px;
       }
     }
 
@@ -139,6 +156,11 @@
       #parcels-list div, #admin-parcels-list div, #admin-users-list div {
         padding: 8px;
         font-size: 14px;
+      }
+
+      .camera-button {
+        padding: 8px;
+        font-size: 12px;
       }
     }
   </style>
@@ -174,27 +196,24 @@
         <h3>Log New Parcel</h3>
         <div style="display: flex; align-items: center; gap: 10px;">
           <input id="awbNumber" placeholder="AWB Number" autocomplete="off" />
-          <button id="scanAWB" onclick="startScannerForAWB()" aria-label="Scan AWB barcode">
+          <button id="scanAWB" onclick="startScannerForAWB()" class="camera-button" aria-label="Scan AWB barcode">
             📷
           </button>
         </div>
         <input id="recipientName" placeholder="Recipient Name" autocomplete="name" />
         <input id="recipientUnit" placeholder="Unit Number" autocomplete="off" />
         <button onclick="logParcel()">Log Parcel</button>
-
-        <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
-          <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
-          <button onclick="playVideo()">Start Camera</button>
-          <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;" autocomplete="off">
-          <button onclick="manualCollectParcel()">Submit Manual AWB</button>
-          <button onclick="stopScanner()">❌ Close Scanner</button>
-        </div>
       </div>
 
       <div id="resident-actions" class="hidden">
         <h3>Your Parcels</h3>
         <div id="parcels-list"></div>
-        <button onclick="startParcelScan()">Collect Parcel</button>
+        <div class="button-group">
+          <button onclick="manualCollectParcel()">Collect Parcel</button>
+          <button onclick="startParcelScan()" class="camera-button" aria-label="Scan parcel barcode">
+            📷
+          </button>
+        </div>
       </div>
 
       <div id="admin-actions" class="hidden">
@@ -208,6 +227,14 @@
 
       <button onclick="logout()">Logout</button>
     </div>
+
+    <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
+      <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
+      <button onclick="playVideo()">Start Camera</button>
+      <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;" autocomplete="off">
+      <button onclick="manualCollectParcel()">Submit Manual AWB</button>
+      <button onclick="stopScanner()">❌ Close Scanner</button>
+    </div>
   </div>
 
   <script>
@@ -215,6 +242,7 @@
       document.getElementById('login-form').classList.add('hidden');
       document.getElementById('register-form').classList.add('hidden');
       document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('scanner').classList.add('hidden');
     }
 
     function hideDashboardSections() {
@@ -472,14 +500,12 @@
         const reader = document.getElementById('reader');
         reader.innerHTML = "";
         scannerContainer.classList.remove('hidden');
-        scannerContainer.style.display = 'block'; // Force visibility
+        scannerContainer.style.display = 'block';
         reader.style.display = 'block';
 
-        // Force layout update
         scannerContainer.offsetHeight;
         reader.offsetHeight;
 
-        // Debug visibility
         console.log("🟢 Scanner container styles:", window.getComputedStyle(scannerContainer));
         console.log("🟢 Reader styles:", window.getComputedStyle(reader));
 
@@ -579,15 +605,10 @@
         return;
       }
       console.log("🟢 Starting parcel scan for AWB:", selectedParcelAWB);
-      
-      // Ensure resident-actions is visible and force layout
-      const residentActions = document.getElementById('resident-actions');
-      residentActions.style.display = 'block';
-      residentActions.offsetHeight;
 
       const scannerContainer = document.getElementById('scanner');
       scannerContainer.classList.remove('hidden');
-      scannerContainer.style.display = 'block'; // Force visibility
+      scannerContainer.style.display = 'block';
       scannerContainer.offsetHeight;
 
       startScanner(function (result) {
@@ -604,11 +625,12 @@
 
     async function manualCollectParcel() {
       const manualAWB = document.getElementById('manualAWB').value.trim();
-      if (!manualAWB) {
-        alert("Please enter an AWB number.");
+      if (!manualAWB && !selectedParcelAWB) {
+        alert("Please select a parcel or enter an AWB number.");
         return;
       }
-      if (manualAWB === selectedParcelAWB) {
+      const awbToCheck = manualAWB || selectedParcelAWB;
+      if (awbToCheck === selectedParcelAWB) {
         stopScanner();
         confirmParcelCollection();
       } else {
