@@ -192,6 +192,39 @@ app.put('/api/admin/users/:id', authenticateToken, restrictTo('admin'), async (r
   }
 });
 
+// Update a parcel (admin only)
+app.put('/api/admin/parcels/:awbNumber', authenticateToken, restrictTo('admin'), async (req, res) => {
+  const { awbNumber } = req.params;
+  const { recipientName, recipientUnit } = req.body;
+
+  if (!recipientName || !recipientUnit) {
+    return res.status(400).json({ msg: 'Recipient name and unit are required' });
+  }
+
+  try {
+    const result = await client.query(
+      'UPDATE parcels SET recipient_name = $1, recipient_unit = $2 WHERE awb_number = $3 RETURNING *',
+      [recipientName, recipientUnit, awbNumber]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: 'Parcel not found' });
+    }
+
+    // Log admin action
+    await client.query('INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, $2, $3)', [
+      req.user.id,
+      'UPDATE_PARCEL',
+      `Updated parcel with AWB ${awbNumber}`
+    ]);
+
+    res.json({ msg: 'Parcel updated successfully', parcel: result.rows[0] });
+  } catch (err) {
+    console.error('Error updating parcel:', err);
+    res.status(500).json({ msg: 'Failed to update parcel' });
+  }
+});
+
 // Delete a parcel (admin only)
 app.delete('/api/admin/parcels/:awbNumber', authenticateToken, restrictTo('admin'), async (req, res) => {
   const { awbNumber } = req.params;
@@ -207,7 +240,7 @@ app.delete('/api/admin/parcels/:awbNumber', authenticateToken, restrictTo('admin
       `Deleted parcel with AWB ${awbNumber}`
     ]);
     res.json({ msg: 'Parcel deleted' });
-  } catch (err) {
+  }-catch (err) {
     console.error('Error deleting parcel:', err);
     res.status(500).json({ msg: 'Failed to delete parcel' });
   }
