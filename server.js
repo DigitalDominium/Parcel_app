@@ -240,7 +240,7 @@ app.delete('/api/admin/parcels/:awbNumber', authenticateToken, restrictTo('admin
       `Deleted parcel with AWB ${awbNumber}`
     ]);
     res.json({ msg: 'Parcel deleted' });
-  }-catch (err) {
+  } catch (err) {
     console.error('Error deleting parcel:', err);
     res.status(500).json({ msg: 'Failed to delete parcel' });
   }
