@@ -1,26 +1,27 @@
 <!DOCTYPE html>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Parcel App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+
     #reader {
       position: relative;
       width: 100%;
       height: 300px;
       border: 1px solid #ccc;
-      overflow: hidden;
+      background: #000; /* Fallback background */
+      overflow: visible;
     }
-    
-    #reader video,
-    #reader canvas {
+
+    #reader video {
       position: absolute;
       top: 0;
       left: 0;
@@ -28,6 +29,16 @@
       height: 100% !important;
       object-fit: cover;
       z-index: 1;
+    }
+
+    #reader canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 2;
+      display: none; /* Hide canvas initially */
     }
 
     body {
@@ -98,7 +109,7 @@
         width: 90%;
         padding: 15px;
       }
-      
+
       input, button {
         padding: 10px;
         font-size: 14px;
@@ -170,17 +181,19 @@
         <h3>Log New Parcel</h3>
         <div style="display: flex; align-items: center; gap: 10px;">
           <input id="awbNumber" placeholder="AWB Number" />
-          <button id="scanAWB" onclick="startScanner()">
+          <button id="scanAWB" onclick="startScannerForAWB()" aria-label="Scan AWB barcode">
             📷
           </button>
         </div>
         <input id="recipientName" placeholder="Recipient Name" />
         <input id="recipientUnit" placeholder="Unit Number" />
         <button onclick="logParcel()">Log Parcel</button>
-        
+
         <!-- Hidden Barcode Scanner -->
         <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
           <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
+          <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;">
+          <button onclick="manualCollectParcel()">Submit Manual AWB</button>
           <button onclick="stopScanner()">❌ Close Scanner</button>
         </div>
       </div>
@@ -232,38 +245,36 @@
     }
 
     async function register() {
-      console.log("🟢 register() called"); // Debug: Confirm function is triggered
-    
+      console.log("🟢 register() called");
       const name = document.getElementById('name').value;
       const unitNumber = document.getElementById('unit').value;
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-    
-      console.log("🟢 Form Data:", { name, unitNumber, email, password }); // Debug: Log form data
-    
+
+      console.log("🟢 Form Data:", { name, unitNumber, email, password });
+
       if (!name || !unitNumber || !email || !password) {
         alert('Please fill in all fields.');
         return;
       }
-    
+
       try {
         const response = await fetch('https://parcel-manager-backend.onrender.com/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, unitNumber, email, password }),
         });
-    
-        console.log("🟢 Fetch Response Status:", response.status); // Debug: Log response status
-    
+
+        console.log("🟢 Fetch Response Status:", response.status);
         const data = await response.json();
-        console.log("🟢 Response Data:", data); // Debug: Log response data
-    
+        console.log("🟢 Response Data:", data);
+
         alert(data.msg);
         if (data.msg === 'Registration successful') {
           showLogin();
         }
       } catch (error) {
-        console.error("❌ Error during registration:", error); // Debug: Log errors
+        console.error("❌ Error during registration:", error);
         alert('Failed to register. Please try again.');
       }
     }
@@ -271,21 +282,21 @@
     async function login() {
       const email = document.getElementById('login-email').value;
       const password = document.getElementById('login-password').value;
-    
+
       const response = await fetch('https://parcel-manager-backend.onrender.com/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-    
+
       const data = await response.json();
-    
+
       if (data.token) {
         token = data.token;
         hideAllSections();
         document.getElementById('dashboard').classList.remove('hidden');
-        document.getElementById('user-name').textContent = data.name; // Use name instead of email
-    
+        document.getElementById('user-name').textContent = data.name;
+
         hideDashboardSections();
         if (data.role === 'guard') {
           document.getElementById('guard-actions').classList.remove('hidden');
@@ -352,7 +363,7 @@
       const parcels = await response.json();
       const parcelsList = document.getElementById('parcels-list');
       const adminParcelsList = document.getElementById('admin-parcels-list');
-      
+
       parcelsList.innerHTML = '';
       if (adminParcelsList) adminParcelsList.innerHTML = '';
 
@@ -384,36 +395,13 @@
       selectedParcelAWB = element.dataset.awbNumber;
     }
 
-    async function collectParcel() {
-      if (!selectedParcelAWB) {
-        alert("Please select a parcel first.");
-        return;
-      }
-  
-      // Show scanner and wait for barcode scan
-      document.getElementById('scanner').classList.remove('hidden');
-  
-      Quagga.offDetected(); // prevent stacking handlers
-      Quagga.onDetected(function (result) {
-        const scannedCode = result.codeResult.code;
-        console.log("Scanned code:", scannedCode);
-  
-        if (scannedCode === selectedParcelAWB) {
-          stopScanner();
-          confirmParcelCollection(); // call original collection handler
-        } else {
-          alert("❌ Wrong parcel scanned. Please scan the correct barcode.");
-        }
-      });
-    }
-
     async function confirmParcelCollection() {
       const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels/collect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ awbNumber: selectedParcelAWB }),
       });
-  
+
       const data = await response.json();
       alert(data.msg);
       loadParcels();
@@ -466,13 +454,13 @@
 
     let token = null;
     let selectedParcelAWB = null;
-
     let startScanner;
     let stopScanner;
 
     document.addEventListener("DOMContentLoaded", function () {
       if (typeof Quagga === "undefined") {
         console.error("❌ QuaggaJS failed to load.");
+        alert("Barcode scanner library failed to load.");
         return;
       }
       console.log("🟢 QuaggaJS loaded successfully");
@@ -483,28 +471,27 @@
 
       startScanner = function (onDetectedCallback) {
         console.log("🟢 startScanner called");
-      
         const scannerContainer = document.getElementById('scanner');
         const reader = document.getElementById('reader');
-      
-        reader.innerHTML = ""; // ✅ Clear previous content
+        reader.innerHTML = ""; // Clear previous content
         scannerContainer.classList.remove('hidden');
-      
+        reader.style.display = 'block'; // Ensure reader is visible
+
         Quagga.init({
           inputStream: {
             type: "LiveStream",
             constraints: {
-              width: 640,
-              height: 480,
-              facingMode: { ideal: "environment" } // better for mobile
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: { ideal: "environment" }
             },
-            target: reader // ✅ must be an element
+            target: reader
           },
           locator: {
             patchSize: "medium",
             halfSample: true
           },
-          numOfWorkers: 2,
+          numOfWorkers: navigator.hardwareConcurrency || 2,
           locate: true,
           decoder: {
             readers: ["code_128_reader", "ean_reader", "upc_reader"]
@@ -512,14 +499,27 @@
         }, function (err) {
           if (err) {
             console.error("❌ Quagga init error:", err);
-            alert("Camera init failed: " + err.message);
+            alert("Camera initialization failed: " + err.message);
+            scannerContainer.classList.add('hidden');
             return;
           }
           console.log("🟢 Quagga initialized successfully");
           Quagga.start();
+
+          // Verify video stream
+          setTimeout(() => {
+            const video = reader.querySelector('video');
+            if (!video || !video.srcObject) {
+              console.error("❌ Video stream not found");
+              alert("Camera stream failed to load.");
+              stopScanner();
+            } else {
+              console.log("🟢 Video stream active");
+            }
+          }, 1000);
         });
-      
-        Quagga.offDetected(); // clear previous
+
+        Quagga.offDetected();
         Quagga.onDetected(onDetectedCallback);
       };
 
@@ -527,17 +527,21 @@
         console.log("🟢 stopScanner called");
         Quagga.stop();
         document.getElementById('scanner').classList.add('hidden');
+        document.getElementById('manualAWB').value = ''; // Clear manual input
       };
 
-      document.getElementById('scanAWB').addEventListener('click', function () {
+      // Scanner for AWB logging (guard)
+      function startScannerForAWB() {
         startScanner(function (result) {
           const barcode = result.codeResult.code;
           console.log("🟢 Barcode value:", barcode);
           document.getElementById('awbNumber').value = barcode;
           stopScanner();
         });
-      });
-      document.querySelector('#scanner button').addEventListener('click', stopScanner);
+      }
+
+      document.getElementById('scanAWB').addEventListener('click', startScannerForAWB);
+      document.querySelector('#scanner button[onclick="stopScanner()"]').addEventListener('click', stopScanner);
     });
 
     function startParcelScan() {
@@ -545,11 +549,11 @@
         alert("Please select a parcel first.");
         return;
       }
-    
+      console.log("🟢 Starting parcel scan for AWB:", selectedParcelAWB);
+      document.getElementById('scanner').classList.remove('hidden');
       startScanner(function (result) {
         const scannedCode = result.codeResult.code;
-        console.log("Scanned code:", scannedCode);
-    
+        console.log("🟢 Scanned code:", scannedCode);
         if (scannedCode === selectedParcelAWB) {
           stopScanner();
           confirmParcelCollection();
@@ -557,6 +561,20 @@
           alert("❌ Wrong parcel scanned. Please scan the correct barcode.");
         }
       });
+    }
+
+    async function manualCollectParcel() {
+      const manualAWB = document.getElementById('manualAWB').value.trim();
+      if (!manualAWB) {
+        alert("Please enter an AWB number.");
+        return;
+      }
+      if (manualAWB === selectedParcelAWB) {
+        stopScanner();
+        confirmParcelCollection();
+      } else {
+        alert("❌ Invalid AWB. Please enter the correct AWB number.");
+      }
     }
   </script>
 </body>
