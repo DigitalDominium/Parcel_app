@@ -4,6 +4,7 @@ import pg from 'pg';
 const { Client } = pg;
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
+import bcrypt from 'bcrypt'; // Added for password hashing
 
 const app = express();
 
@@ -49,12 +50,17 @@ const restrictTo = (...roles) => {
 app.post('/api/auth/register', async (req, res) => {
   const { name, unitNumber, email, password } = req.body;
 
+  if (!name || !email || !password) {
+    return res.status(400).json({ msg: 'Name, email, and password are required' });
+  }
+
   try {
     const role = email === 'admin@example.com' ? 'admin' : (unitNumber === 'N/A' ? 'guard' : 'resident');
-    
+    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
+
     await client.query(
       'INSERT INTO users (name, unit_number, email, password, role) VALUES ($1, $2, $3, $4, $5)',
-      [name, unitNumber, email, password, role]
+      [name, unitNumber || null, email, hashedPassword, role]
     );
     res.json({ msg: 'Registration successful' });
   } catch (err) {
@@ -71,19 +77,28 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
+  if (!email || !password) {
+    return res.status(400).json({ msg: 'Email and password are required' });
+  }
+
   try {
     const result = await client.query(
-      'SELECT * FROM users WHERE email = $1 AND password = $2',
-      [email, password]
+      'SELECT * FROM users WHERE email = $1',
+      [email]
     );
 
-    if (result.rows.length > 0) {
-      const user = result.rows[0];
-      const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-      res.json({ token, role: user.role, name: user.name }); // Add name to response
-    } else {
-      res.status(401).json({ msg: 'Invalid email or password' });
+    if (result.rows.length === 0) {
+      return res.status(401).json({ msg: 'Invalid email or password' });
     }
+
+    const user = result.rows[0];
+    const isMatch = await bcrypt.compare(password, user.password); // Compare hashed password
+    if (!isMatch) {
+      return res.status(401).json({ msg: 'Invalid email or password' });
+    }
+
+    const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token, role: user.role, name: user.name });
   } catch (err) {
     console.error('Error logging in:', err);
     res.status(500).json({ msg: 'Login failed' });
@@ -99,6 +114,81 @@ app.get('/api/admin/users', authenticateToken, restrictTo('admin'), async (req, 
   } catch (err) {
     console.error('Error retrieving users:', err);
     res.status(500).json({ msg: 'Failed to retrieve users' });
+  }
+});
+
+// Add a new user (admin only)
+app.post('/api/admin/users', authenticateToken, restrictTo('admin'), async (req, res) => {
+  const { name, email, password, unitNumber, role } = req.body;
+
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ msg: 'Name, email, password, and role are required' });
+  }
+
+  try {
+    const checkResult = await client.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (checkResult.rows.length > 0) {
+      return res.status(409).json({ msg: 'Email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
+    await client.query(
+      'INSERT INTO users (name, unit_number, email, password, role) VALUES ($1, $2, $3, $4, $5)',
+      [name, unitNumber || null, email, hashedPassword, role]
+    );
+
+    // Log admin action
+    await client.query('INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, $2, $3)', [
+      req.user.id,
+      'CREATE_USER',
+      `Created user with email ${email}`
+    ]);
+
+    res.status(201).json({ msg: 'User created successfully' });
+  } catch (err) {
+    console.error('Error creating user:', err);
+    if (err.code === '23505') {
+      res.status(409).json({ msg: 'Email already exists' });
+    } else {
+      res.status(500).json({ msg: 'Failed to create user' });
+    }
+  }
+});
+
+// Update a user (admin only)
+app.put('/api/admin/users/:id', authenticateToken, restrictTo('admin'), async (req, res) => {
+  const { id } = req.params;
+  const { name, email, unitNumber, role } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).json({ msg: 'Name, email, and role are required' });
+  }
+
+  try {
+    const result = await client.query(
+      'UPDATE users SET name = $1, email = $2, unit_number = $3, role = $4 WHERE id = $5 RETURNING *',
+      [name, email, unitNumber || null, role, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    // Log admin action
+    await client.query('INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, $2, $3)', [
+      req.user.id,
+      'UPDATE_USER',
+      `Updated user with ID ${id}`
+    ]);
+
+    res.json({ msg: 'User updated successfully' });
+  } catch (err) {
+    console.error('Error updating user:', err);
+    if (err.code === '23505') {
+      res.status(409).json({ msg: 'Email already exists' });
+    } else {
+      res.status(500).json({ msg: 'Failed to update user' });
+    }
   }
 });
 
@@ -151,6 +241,10 @@ app.get('/api/parcels', authenticateToken, async (req, res) => {
 app.post('/api/parcels', authenticateToken, restrictTo('guard', 'admin'), async (req, res) => {
   const { awbNumber, recipientName, recipientUnit } = req.body;
 
+  if (!awbNumber || !recipientName || !recipientUnit) {
+    return res.status(400).json({ msg: 'AWB number, recipient name, and unit are required' });
+  }
+
   try {
     const checkResult = await client.query('SELECT * FROM parcels WHERE awb_number = $1', [awbNumber]);
     if (checkResult.rows.length > 0) {
@@ -161,6 +255,13 @@ app.post('/api/parcels', authenticateToken, restrictTo('guard', 'admin'), async 
       'INSERT INTO parcels (awb_number, recipient_name, recipient_unit, delivered_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING *',
       [awbNumber, recipientName, recipientUnit]
     );
+
+    // Log admin/guard action
+    await client.query('INSERT INTO admin_logs (admin_id, action, details) VALUES ($1, $2, $3)', [
+      req.user.id,
+      'LOG_PARCEL',
+      `Logged parcel with AWB ${awbNumber}`
+    ]);
 
     res.json({ msg: 'Parcel logged successfully', parcel: result.rows[0] });
   } catch (err) {
