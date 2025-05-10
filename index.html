@@ -270,35 +270,119 @@
 
       <div id="admin-actions" class="hidden">
         <h3>Admin Dashboard</h3>
-        <h4>Users</h4>
-        <div id="admin-users-list">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Unit</th>
-              </tr>
-            </thead>
-            <tbody id="admin-users-table-body"></tbody>
-          </table>
+        <div id="admin-main-buttons">
+          <button onclick="showAdminUsers()">Users</button>
+          <button onclick="showAdminParcels()">Parcels</button>
         </div>
-        <h4>Parcels</h4>
-        <div id="admin-parcels-list">
-          <table>
-            <thead>
-              <tr>
-                <th>AWB</th>
-                <th>Recipient</th>
-                <th>Unit</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="admin-parcels-table-body"></tbody>
-          </table>
+
+        <div id="admin-users-section" class="hidden">
+          <h4>Manage Users</h4>
+          <div id="admin-users-list">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Unit</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-table-body"></tbody>
+            </table>
+          </div>
+          <h4>Add New User</h4>
+          <input id="admin-user-name" placeholder="Name" autocomplete="name" />
+          <input id="admin-user-unit" placeholder="Unit Number" autocomplete="off" />
+          <input id="admin-user-email" placeholder="Email" autocomplete="email" />
+          <input id="admin-user-password" type="password" placeholder="Password" autocomplete="new-password" />
+          <select id="admin-user-role">
+            <option value="resident">Resident</option>
+            <option value="guard">Guard</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button onclick="addNewUser()">Add User</button>
+          <button onclick="backToAdminMain()">Back</button>
         </div>
-        <button onclick="deleteSelectedParcel()">Delete Selected Parcel</button>
+
+        <div id="admin-parcels-section" class="hidden">
+          <div id="admin-parcels-buttons">
+            <button onclick="showViewParcels()">View Parcels</button>
+            <button onclick="showEditParcels()" class="hidden">Edit Parcels</button>
+            <button onclick="showAddParcels()">Add Parcels</button>
+            <button onclick="showDeleteParcels()">Delete Parcels</button>
+            <button onclick="backToAdminMain()">Back</button>
+          </div>
+
+          <div id="admin-view-parcels" class="hidden">
+            <h4>View Parcels</h4>
+            <div id="admin-parcels-list">
+              <table>
+                <thead>
+                  <tr>
+                    <th>AWB</th>
+                    <th>Recipient</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-parcels-table-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="admin-edit-parcels" class="hidden">
+            <h4>Edit Parcel</h4>
+            <p>Select a parcel to edit its details.</p>
+            <div id="admin-parcels-list-edit">
+              <table>
+                <thead>
+                  <tr>
+                    <th>AWB</th>
+                    <th>Recipient</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-parcels-table-body-edit"></tbody>
+              </table>
+            </div>
+            <input id="edit-awbNumber" placeholder="AWB Number" autocomplete="off" disabled />
+            <input id="edit-recipientName" placeholder="Recipient Name" autocomplete="name" />
+            <input id="edit-recipientUnit" placeholder="Unit Number" autocomplete="off" />
+            <button onclick="saveParcelEdits()">Save Changes</button>
+          </div>
+
+          <div id="admin-add-parcels" class="hidden">
+            <h4>Add New Parcel</h4>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <input id="admin-add-awbNumber" placeholder="AWB Number" autocomplete="off" />
+              <button id="admin-scanAWB" onclick="startScannerForAdminAdd()" class="camera-button" aria-label="Scan AWB barcode">
+                📷
+              </button>
+            </div>
+            <input id="admin-add-recipientName" placeholder="Recipient Name" autocomplete="name" />
+            <input id="admin-add-recipientUnit" placeholder="Unit Number" autocomplete="off" />
+            <button onclick="adminAddParcel()">Add Parcel</button>
+          </div>
+
+          <div id="admin-delete-parcels" class="hidden">
+            <h4>Delete Parcels</h4>
+            <div id="admin-parcels-list-delete">
+              <table>
+                <thead>
+                  <tr>
+                    <th>AWB</th>
+                    <th>Recipient</th>
+                    <th>Unit</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-parcels-table-body-delete"></tbody>
+              </table>
+            </div>
+            <button onclick="deleteSelectedParcel()">Delete Selected Parcel</button>
+          </div>
+        </div>
       </div>
 
       <button onclick="logout()">Logout</button>
@@ -399,8 +483,7 @@
           loadParcels();
         } else if (data.role === 'admin') {
           document.getElementById('admin-actions').classList.remove('hidden');
-          loadUsers();
-          loadParcels();
+          showAdminMain();
         }
         alert(`Logged in as ${data.role}`);
       } else {
@@ -449,14 +532,56 @@
       }
     }
 
-    async function loadParcels() {
+    async function adminAddParcel() {
+      const awbNumber = document.getElementById('admin-add-awbNumber').value.trim();
+      const recipientName = document.getElementById('admin-add-recipientName').value.trim();
+      const recipientUnit = document.getElementById('admin-add-recipientUnit').value.trim();
+
+      if (!awbNumber || !recipientName || !recipientUnit) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      try {
+        const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            awbNumber,
+            recipientName,
+            recipientUnit
+          })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          alert(data.msg || 'Parcel added successfully');
+          document.getElementById('admin-add-awbNumber').value = '';
+          document.getElementById('admin-add-recipientName').value = '';
+          document.getElementById('admin-add-recipientUnit').value = '';
+          showViewParcels(); // Refresh the parcel list
+        } else if (response.status === 409) {
+          alert('Error: This AWB number is already logged. Please use a unique AWB number.');
+        } else {
+          alert(`Error: ${data.msg || 'Failed to add parcel. Please try again.'}`);
+        }
+      } catch (error) {
+        console.error('Error adding parcel:', error);
+        alert('An unexpected error occurred. Please try again.');
+      }
+    }
+
+    async function loadParcels(containerId = 'admin-parcels-table-body') {
       const response = await fetch('https://parcel-manager-backend.onrender.com/api/parcels', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       const parcels = await response.json();
       const parcelsList = document.getElementById('parcels-list');
-      const adminParcelsTableBody = document.getElementById('admin-parcels-table-body');
+      const adminParcelsTableBody = document.getElementById(containerId);
 
       parcelsList.innerHTML = '';
       if (adminParcelsTableBody) adminParcelsTableBody.innerHTML = '';
@@ -504,6 +629,10 @@
         parentSelector = '#parcels-list div';
       } else if (parentId === 'admin-parcels-table-body') {
         parentSelector = '#admin-parcels-table-body tr';
+      } else if (parentId === 'admin-parcels-table-body-edit') {
+        parentSelector = '#admin-parcels-table-body-edit tr';
+      } else if (parentId === 'admin-parcels-table-body-delete') {
+        parentSelector = '#admin-parcels-table-body-delete tr';
       } else {
         console.error('Unknown parent for selection:', parentId);
         return;
@@ -513,6 +642,14 @@
       element.classList.add("selected");
       selectedParcelAWB = element.dataset.awbNumber;
       console.log("🟢 Selected parcel AWB:", selectedParcelAWB);
+
+      // If in edit mode, populate the form
+      if (parentId === 'admin-parcels-table-body-edit') {
+        const row = element;
+        document.getElementById('edit-awbNumber').value = row.cells[0].textContent;
+        document.getElementById('edit-recipientName').value = row.cells[1].textContent;
+        document.getElementById('edit-recipientUnit').value = row.cells[2].textContent;
+      }
     }
 
     async function confirmParcelCollection() {
@@ -553,6 +690,79 @@
       });
     }
 
+    async function addNewUser() {
+      const name = document.getElementById('admin-user-name').value;
+      const unitNumber = document.getElementById('admin-user-unit').value;
+      const email = document.getElementById('admin-user-email').value;
+      const password = document.getElementById('admin-user-password').value;
+      const role = document.getElementById('admin-user-role').value;
+
+      if (!name || !email || !password || !role) {
+        alert('Please fill in all required fields.');
+        return;
+      }
+
+      try {
+        const response = await fetch('https://parcel-manager-backend.onrender.com/api/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ name, unitNumber, email, password, role })
+        });
+
+        const data = await response.json();
+        alert(data.msg);
+        if (response.ok) {
+          document.getElementById('admin-user-name').value = '';
+          document.getElementById('admin-user-unit').value = '';
+          document.getElementById('admin-user-email').value = '';
+          document.getElementById('admin-user-password').value = '';
+          document.getElementById('admin-user-role').value = 'resident';
+          loadUsers();
+        }
+      } catch (error) {
+        console.error('Error adding user:', error);
+        alert('Failed to add user. Please try again.');
+      }
+    }
+
+    async function saveParcelEdits() {
+      const awbNumber = document.getElementById('edit-awbNumber').value.trim();
+      const recipientName = document.getElementById('edit-recipientName').value.trim();
+      const recipientUnit = document.getElementById('edit-recipientUnit').value.trim();
+
+      if (!awbNumber || !recipientName || !recipientUnit) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      try {
+        const response = await fetch(`https://parcel-manager-backend.onrender.com/api/admin/parcels/${awbNumber}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            awbNumber,
+            recipientName,
+            recipientUnit
+          })
+        });
+
+        const data = await response.json();
+        alert(data.msg);
+        if (response.ok) {
+          showViewParcels(); // Refresh the parcel list
+        }
+      } catch (error) {
+        console.error('Error editing parcel:', error);
+        alert('Failed to edit parcel. Please try again.');
+      }
+    }
+
     async function deleteSelectedParcel() {
       if (!selectedParcelAWB) {
         alert("Please select a parcel first.");
@@ -566,7 +776,8 @@
 
       const data = await response.json();
       alert(data.msg);
-      loadParcels();
+      loadParcels('admin-parcels-table-body');
+      loadParcels('admin-parcels-table-body-delete');
     }
 
     function logout() {
@@ -575,6 +786,69 @@
       hideAllSections();
       hideDashboardSections();
       document.getElementById('login-form').classList.remove('hidden');
+    }
+
+    function showAdminMain() {
+      document.getElementById('admin-main-buttons').classList.remove('hidden');
+      document.getElementById('admin-users-section').classList.add('hidden');
+      document.getElementById('admin-parcels-section').classList.add('hidden');
+    }
+
+    function showAdminUsers() {
+      document.getElementById('admin-main-buttons').classList.add('hidden');
+      document.getElementById('admin-users-section').classList.remove('hidden');
+      document.getElementById('admin-parcels-section').classList.add('hidden');
+      loadUsers();
+    }
+
+    function showAdminParcels() {
+      document.getElementById('admin-main-buttons').classList.add('hidden');
+      document.getElementById('admin-users-section').classList.add('hidden');
+      document.getElementById('admin-parcels-section').classList.remove('hidden');
+      document.getElementById('admin-parcels-buttons').classList.remove('hidden');
+      document.getElementById('admin-view-parcels').classList.add('hidden');
+      document.getElementById('admin-edit-parcels').classList.add('hidden');
+      document.getElementById('admin-add-parcels').classList.add('hidden');
+      document.getElementById('admin-delete-parcels').classList.add('hidden');
+    }
+
+    function showViewParcels() {
+      document.getElementById('admin-parcels-buttons').classList.add('hidden');
+      document.getElementById('admin-view-parcels').classList.remove('hidden');
+      document.getElementById('admin-edit-parcels').classList.add('hidden');
+      document.getElementById('admin-add-parcels').classList.add('hidden');
+      document.getElementById('admin-delete-parcels').classList.add('hidden');
+      loadParcels('admin-parcels-table-body');
+    }
+
+    function showEditParcels() {
+      document.getElementById('admin-parcels-buttons').classList.add('hidden');
+      document.getElementById('admin-view-parcels').classList.add('hidden');
+      document.getElementById('admin-edit-parcels').classList.remove('hidden');
+      document.getElementById('admin-add-parcels').classList.add('hidden');
+      document.getElementById('admin-delete-parcels').classList.add('hidden');
+      loadParcels('admin-parcels-table-body-edit');
+    }
+
+    function showAddParcels() {
+      document.getElementById('admin-parcels-buttons').classList.add('hidden');
+      document.getElementById('admin-view-parcels').classList.add('hidden');
+      document.getElementById('admin-edit-parcels').classList.add('hidden');
+      document.getElementById('admin-add-parcels').classList.remove('hidden');
+      document.getElementById('admin-delete-parcels').classList.add('hidden');
+    }
+
+    function showDeleteParcels() {
+      document.getElementById('admin-parcels-buttons').classList.add('hidden');
+      document.getElementById('admin-view-parcels').classList.add('hidden');
+      document.getElementById('admin-edit-parcels').classList.add('hidden');
+      document.getElementById('admin-add-parcels').classList.add('hidden');
+      document.getElementById('admin-delete-parcels').classList.remove('hidden');
+      loadParcels('admin-parcels-table-body-delete');
+    }
+
+    function backToAdminMain() {
+      showAdminMain();
     }
 
     let token = null;
@@ -689,7 +963,17 @@
         });
       }
 
+      function startScannerForAdminAdd() {
+        startScanner(function (result) {
+          const barcode = result.codeResult.code;
+          console.log("🟢 Barcode value:", barcode);
+          document.getElementById('admin-add-awbNumber').value = barcode;
+          stopScanner();
+        });
+      }
+
       document.getElementById('scanAWB').addEventListener('click', startScannerForAWB);
+      document.getElementById('admin-scanAWB').addEventListener('click', startScannerForAdminAdd);
       document.querySelector('#scanner button[onclick="stopScanner()"]').addEventListener('click', stopScanner);
     });
 
