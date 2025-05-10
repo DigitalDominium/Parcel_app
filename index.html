@@ -11,7 +11,7 @@
       margin: 0;
       padding: 0;
     }
-
+  
     #reader {
       position: relative;
       width: 100%;
@@ -20,7 +20,7 @@
       background: #000;
       overflow: visible;
     }
-
+  
     #reader video {
       position: absolute;
       top: 0;
@@ -31,7 +31,7 @@
       z-index: 1;
       display: block !important;
     }
-
+  
     #reader canvas {
       position: absolute;
       top: 0;
@@ -41,32 +41,51 @@
       z-index: 2;
       display: none;
     }
-
+  
     body {
       font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
       padding: 10px;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      background-image: url('https://github.com/DigitalDominium/Parcel_app/raw/main/ChatGPT%20Image%20May%2010%2C%202025%20at%2008_30_25%20PM.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
     }
-
+  
+    /* Add a semi-transparent overlay to improve text readability */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5); /* Dark overlay with 50% opacity */
+      z-index: 0;
+    }
+  
     #app {
       max-width: 600px;
       width: 100%;
       margin: auto;
-      background: white;
+      background: rgba(255, 255, 255, 0.95); /* Slightly transparent white background for readability */
       padding: 20px;
       border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      position: relative;
+      z-index: 1; /* Ensure content is above the overlay */
     }
-
+  
     h1, h2, h3, h4 {
       text-align: center;
       margin-bottom: 15px;
+      color: #333; /* Darker text for better contrast */
     }
-
+  
     input, select, button {
       display: block;
       width: 100%;
@@ -76,7 +95,7 @@
       border: 1px solid #ccc;
       font-size: 16px;
     }
-
+  
     button {
       background: #007bff;
       color: white;
@@ -84,45 +103,45 @@
       cursor: pointer;
       transition: background 0.3s;
     }
-
+  
     button:hover {
       background: #0056b3;
     }
-
+  
     .hidden {
       display: none !important;
     }
-
+  
     /* Table Styling */
     table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 20px;
     }
-
+  
     th, td {
       padding: 12px;
       text-align: left;
       border-bottom: 1px solid #ddd;
     }
-
+  
     th {
       background-color: #f8f8f8;
       font-weight: bold;
     }
-
+  
     tr:nth-child(even) {
       background-color: #f9f9f9;
     }
-
+  
     tr:hover {
       background-color: #f1f1f1;
     }
-
+  
     tr.selected {
       background-color: #d1e7fd !important;
     }
-
+  
     /* Parcel List Styling (Resident Flow) */
     #parcels-list div {
       padding: 12px;
@@ -130,92 +149,138 @@
       cursor: pointer;
       text-align: center;
     }
-
+  
     #parcels-list div.selected {
       background: #d1e7fd;
     }
-
+  
     #scanner {
       z-index: 10;
     }
-
+  
     .button-group {
       display: flex;
       align-items: center;
       gap: 10px;
     }
-
+  
     .camera-button {
       width: auto;
       padding: 12px;
       font-size: 16px;
     }
-
+  
+    /* Medium screens (tablets, max-width: 768px) */
     @media (max-width: 768px) {
+      body {
+        background-attachment: scroll; /* Fixed background can be jarring on smaller screens */
+        background-size: cover; /* Ensure the image still covers the screen */
+      }
+  
+      body::before {
+        background: rgba(0, 0, 0, 0.6); /* Slightly darker overlay for better contrast */
+      }
+  
       #app {
         width: 90%;
         padding: 15px;
+        background: rgba(255, 255, 255, 0.97); /* Slightly less transparent for better readability */
+        box-shadow: 0 0 8px rgba(0,0,0,0.2);
       }
-
-      input, button {
+  
+      input, select, button {
         padding: 10px;
         font-size: 14px;
       }
-
+  
       h1 {
         font-size: 24px;
       }
-
+  
       h2, h3, h4 {
         font-size: 18px;
       }
-
+  
       .camera-button {
         padding: 10px;
         font-size: 14px;
       }
-
+  
       th, td {
         padding: 10px;
         font-size: 14px;
       }
+  
+      table {
+        font-size: 14px;
+      }
+  
+      #reader {
+        height: 250px; /* Reduce scanner height for smaller screens */
+      }
     }
-
+  
+    /* Small screens (mobile, max-width: 480px) */
     @media (max-width: 480px) {
+      body {
+        background-attachment: scroll;
+        background-size: cover;
+        padding: 5px; /* Reduce padding on very small screens */
+      }
+  
+      body::before {
+        background: rgba(0, 0, 0, 0.7); /* Even darker overlay for mobile readability */
+      }
+  
       #app {
         width: 95%;
         padding: 10px;
+        background: rgba(255, 255, 255, 0.98); /* Almost opaque background for maximum readability */
+        box-shadow: 0 0 6px rgba(0,0,0,0.2);
       }
-
+  
       h1 {
         font-size: 20px;
       }
-
+  
       h2, h3, h4 {
         font-size: 16px;
       }
-
-      input, button {
+  
+      input, select, button {
         padding: 8px;
         font-size: 12px;
       }
-
+  
       th, td {
         padding: 8px;
         font-size: 12px;
       }
-
+  
+      table {
+        font-size: 12px;
+      }
+  
       .camera-button {
         padding: 8px;
         font-size: 12px;
       }
-
+  
       #parcels-list div {
         padding: 8px;
         font-size: 14px;
       }
+  
+      #reader {
+        height: 200px; /* Further reduce scanner height for mobile */
+      }
+  
+      .button-group {
+        flex-direction: column; /* Stack buttons vertically on small screens */
+        gap: 5px;
+      }
     }
-  </style>
+</style>
 </head>
 <body>
   <div id="app">
