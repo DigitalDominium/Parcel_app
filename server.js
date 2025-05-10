@@ -296,23 +296,6 @@ app.post('/api/parcels/collect', authenticateToken, restrictTo('resident'), asyn
   }
 });
 
-// **Temporary Endpoint to Hash a Password (Remove After Use)**
-app.post('/api/hash-password', async (req, res) => {
-  const { password } = req.body;
-
-  if (!password) {
-    return res.status(400).json({ msg: 'Password is required' });
-  }
-
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    res.json({ hashedPassword });
-  } catch (err) {
-    console.error('Error hashing password:', err);
-    res.status(500).json({ msg: 'Failed to hash password' });
-  }
-});
-
 // **Start Server**
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
