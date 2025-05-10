@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Parcel App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -30,16 +29,6 @@
       object-fit: cover;
       z-index: 1;
       display: block !important;
-    }
-
-    #reader canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100% !important;
-      height: 100% !important;
-      z-index: 2;
-      display: none;
     }
 
     body {
@@ -191,6 +180,7 @@
 
         <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
           <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
+          <button onclick="playVideo()">Start Camera</button>
           <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;" autocomplete="off">
           <button onclick="manualCollectParcel()">Submit Manual AWB</button>
           <button onclick="stopScanner()">❌ Close Scanner</button>
@@ -452,14 +442,21 @@
     let selectedParcelAWB = null;
     let startScanner;
     let stopScanner;
+    let barcodeDetector;
+    let scanningInterval;
 
     document.addEventListener("DOMContentLoaded", function () {
-      if (typeof Quagga === "undefined") {
-        console.error("❌ Quagga2 failed to load.");
-        alert("Barcode scanner library failed to load.");
+      if (!('BarcodeDetector' in window)) {
+        console.error("❌ BarcodeDetector API not supported in this browser.");
+        alert("Barcode scanning is not supported in this browser. Please use a modern browser like Chrome, Edge, or Safari 15+.");
         return;
       }
-      console.log("🟢 Quagga2 loaded successfully");
+
+      barcodeDetector = new BarcodeDetector({
+        formats: ['code_128', 'ean_13', 'upc_a', 'upc_e']
+      });
+
+      console.log("🟢 BarcodeDetector initialized successfully");
 
       hideAllSections();
       hideDashboardSections();
@@ -474,74 +471,84 @@
         reader.style.display = 'block';
 
         // Force layout update
-        scannerContainer.offsetHeight; // Trigger reflow
+        scannerContainer.offsetHeight;
+
+        const video = document.createElement('video');
+        video.setAttribute('playsinline', ''); // Required for iOS Safari
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.display = 'block';
+        reader.appendChild(video);
 
         try {
-          await Quagga.init({
-            inputStream: {
-              name: "Live",
-              type: "LiveStream",
-              target: reader,
-              constraints: {
-                width: { ideal: 640 },
-                height: { ideal: 480 },
-                facingMode: "environment"
-              }
-            },
-            decoder: {
-              readers: ["code_128_reader", "ean_reader", "upc_reader"],
-              multiple: false
-            },
-            locate: true
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'environment'
+            }
           });
 
-          console.log("🟢 Quagga2 initialized successfully");
-          Quagga.start();
+          video.srcObject = stream;
+          console.log("🟢 Video stream attached");
 
           setTimeout(() => {
-            const video = reader.querySelector('video');
-            if (!video) {
-              console.error("❌ No video element found in #reader");
-              alert("Camera stream failed to load: Video element not found.");
-              stopScanner();
-              return;
-            }
-            if (!video.srcObject) {
+            const videoElement = reader.querySelector('video');
+            if (!videoElement || !videoElement.srcObject) {
               console.error("❌ Video stream not found");
-              alert("Camera stream failed to load: No stream attached.");
+              alert("Camera stream failed to load.");
               stopScanner();
               return;
             }
-            console.log("🟢 Video element found:", video);
+            console.log("🟢 Video element found:", videoElement);
             console.log("🟢 Video stream active");
-            video.style.display = 'block';
-            video.style.width = '100%';
-            video.style.height = '100%';
-            video.play().catch(err => {
-              console.error("❌ Video play error:", err);
-              alert("Failed to play video stream: " + err.message);
-            });
           }, 1000);
 
-          Quagga.onDetected((result) => {
-            if (result && result.codeResult && result.codeResult.code) {
-              onDetectedCallback(result);
+          // Start barcode detection
+          const detectBarcodes = async () => {
+            try {
+              const barcodes = await barcodeDetector.detect(video);
+              if (barcodes.length > 0) {
+                const barcode = barcodes[0];
+                console.log("🟢 Barcode detected:", barcode.rawValue);
+                onDetectedCallback({ codeResult: { code: barcode.rawValue } });
+              }
+            } catch (err) {
+              console.error("❌ Barcode detection error:", err);
             }
-          });
+          };
+
+          scanningInterval = setInterval(detectBarcodes, 500);
         } catch (err) {
-          console.error("❌ Quagga2 init error:", err);
-          alert("Camera initialization failed: " + err.message);
+          console.error("❌ Camera access error:", err);
+          alert("Failed to access camera: " + err.message);
           scannerContainer.classList.add('hidden');
         }
       };
 
       stopScanner = function () {
         console.log("🟢 stopScanner called");
-        Quagga.stop();
-        Quagga.offDetected();
+        clearInterval(scanningInterval);
+        const video = document.getElementById('reader').querySelector('video');
+        if (video && video.srcObject) {
+          const stream = video.srcObject;
+          const tracks = stream.getTracks();
+          tracks.forEach(track => track.stop());
+          video.srcObject = null;
+        }
         document.getElementById('scanner').classList.add('hidden');
         document.getElementById('manualAWB').value = '';
       };
+
+      function playVideo() {
+        const video = document.getElementById('reader').querySelector('video');
+        if (video) {
+          video.play().catch(err => {
+            console.error("❌ Video play error:", err);
+            alert("Failed to play video stream: " + err.message);
+          });
+        }
+      }
 
       function startScannerForAWB() {
         startScanner(function (result) {
