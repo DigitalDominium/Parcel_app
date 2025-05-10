@@ -93,6 +93,10 @@
       background: #d1e7fd;
     }
 
+    #scanner {
+      z-index: 10; /* Ensure scanner is above other elements */
+    }
+
     @media (max-width: 768px) {
       #app {
         width: 90%;
@@ -468,13 +472,19 @@
         const reader = document.getElementById('reader');
         reader.innerHTML = "";
         scannerContainer.classList.remove('hidden');
+        scannerContainer.style.display = 'block'; // Force visibility
         reader.style.display = 'block';
 
         // Force layout update
         scannerContainer.offsetHeight;
+        reader.offsetHeight;
+
+        // Debug visibility
+        console.log("🟢 Scanner container styles:", window.getComputedStyle(scannerContainer));
+        console.log("🟢 Reader styles:", window.getComputedStyle(reader));
 
         const video = document.createElement('video');
-        video.setAttribute('playsinline', ''); // Required for iOS Safari
+        video.setAttribute('playsinline', '');
         video.style.width = '100%';
         video.style.height = '100%';
         video.style.display = 'block';
@@ -502,9 +512,9 @@
             }
             console.log("🟢 Video element found:", videoElement);
             console.log("🟢 Video stream active");
+            console.log("🟢 Video styles:", window.getComputedStyle(videoElement));
           }, 1000);
 
-          // Start barcode detection
           const detectBarcodes = async () => {
             try {
               const barcodes = await barcodeDetector.detect(video);
@@ -569,7 +579,17 @@
         return;
       }
       console.log("🟢 Starting parcel scan for AWB:", selectedParcelAWB);
-      document.getElementById('scanner').classList.remove('hidden');
+      
+      // Ensure resident-actions is visible and force layout
+      const residentActions = document.getElementById('resident-actions');
+      residentActions.style.display = 'block';
+      residentActions.offsetHeight;
+
+      const scannerContainer = document.getElementById('scanner');
+      scannerContainer.classList.remove('hidden');
+      scannerContainer.style.display = 'block'; // Force visibility
+      scannerContainer.offsetHeight;
+
       startScanner(function (result) {
         const scannedCode = result.codeResult.code;
         console.log("🟢 Scanned code:", scannedCode);
