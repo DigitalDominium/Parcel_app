@@ -29,6 +29,7 @@
       height: 100% !important;
       object-fit: cover;
       z-index: 1;
+      display: block !important; /* Force visibility */
     }
 
     #reader canvas {
@@ -38,7 +39,7 @@
       width: 100% !important;
       height: 100% !important;
       z-index: 2;
-      display: none; /* Hide canvas initially */
+      display: none; /* Hide canvas to avoid overlay issues */
     }
 
     body {
@@ -157,7 +158,7 @@
     <div id="login-form">
       <h2>Login</h2>
       <form id="loginForm" onsubmit="event.preventDefault(); login();">
-        <input id="login-email" type="email" placeholder="Email" autocomplete="username" required />
+        <input id="login-email" type="email" placeholder="Email" autocomplete="email" required />
         <input id="login-password" type="password" placeholder="Password" autocomplete="current-password" required />
         <button type="submit">Login</button>
       </form>
@@ -166,10 +167,10 @@
 
     <div id="register-form" class="hidden">
       <h2>Register</h2>
-      <input id="name" placeholder="Name" />
-      <input id="unit" placeholder="Unit Number" />
-      <input id="email" placeholder="Email" />
-      <input id="password" type="password" placeholder="Password" />
+      <input id="name" placeholder="Name" autocomplete="name" />
+      <input id="unit" placeholder="Unit Number" autocomplete="off" />
+      <input id="email" placeholder="Email" autocomplete="email" />
+      <input id="password" type="password" placeholder="Password" autocomplete="new-password" />
       <button onclick="register()">Sign Up</button>
       <button onclick="showLogin()">Back to Login</button>
     </div>
@@ -180,19 +181,19 @@
       <div id="guard-actions" class="hidden">
         <h3>Log New Parcel</h3>
         <div style="display: flex; align-items: center; gap: 10px;">
-          <input id="awbNumber" placeholder="AWB Number" />
+          <input id="awbNumber" placeholder="AWB Number" autocomplete="off" />
           <button id="scanAWB" onclick="startScannerForAWB()" aria-label="Scan AWB barcode">
             📷
           </button>
         </div>
-        <input id="recipientName" placeholder="Recipient Name" />
-        <input id="recipientUnit" placeholder="Unit Number" />
+        <input id="recipientName" placeholder="Recipient Name" autocomplete="name" />
+        <input id="recipientUnit" placeholder="Unit Number" autocomplete="off" />
         <button onclick="logParcel()">Log Parcel</button>
 
         <!-- Hidden Barcode Scanner -->
         <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
           <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
-          <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;">
+          <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;" autocomplete="off">
           <button onclick="manualCollectParcel()">Submit Manual AWB</button>
           <button onclick="stopScanner()">❌ Close Scanner</button>
         </div>
@@ -485,7 +486,13 @@
               height: { ideal: 480 },
               facingMode: { ideal: "environment" }
             },
-            target: reader
+            target: reader,
+            area: { // Define scanning area to reduce processing
+              top: "0%",
+              right: "0%",
+              left: "0%",
+              bottom: "0%"
+            }
           },
           locator: {
             patchSize: "medium",
@@ -495,7 +502,8 @@
           locate: true,
           decoder: {
             readers: ["code_128_reader", "ean_reader", "upc_reader"]
-          }
+          },
+          frequency: 10 // Reduce frame processing frequency
         }, function (err) {
           if (err) {
             console.error("❌ Quagga init error:", err);
@@ -506,16 +514,31 @@
           console.log("🟢 Quagga initialized successfully");
           Quagga.start();
 
-          // Verify video stream
+          // Verify video element and stream
           setTimeout(() => {
             const video = reader.querySelector('video');
-            if (!video || !video.srcObject) {
-              console.error("❌ Video stream not found");
-              alert("Camera stream failed to load.");
+            if (!video) {
+              console.error("❌ No video element found in #reader");
+              alert("Camera stream failed to load: Video element not found.");
               stopScanner();
-            } else {
-              console.log("🟢 Video stream active");
+              return;
             }
+            if (!video.srcObject) {
+              console.error("❌ Video stream not found");
+              alert("Camera stream failed to load: No stream attached.");
+              stopScanner();
+              return;
+            }
+            console.log("🟢 Video element found:", video);
+            console.log("🟢 Video stream active");
+            // Force video visibility
+            video.style.display = 'block';
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.play().catch(err => {
+              console.error("❌ Video play error:", err);
+              alert("Failed to play video stream: " + err.message);
+            });
           }, 1000);
         });
 
