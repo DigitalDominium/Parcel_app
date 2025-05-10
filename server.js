@@ -4,7 +4,7 @@ import pg from 'pg';
 const { Client } = pg;
 import jwt from 'jsonwebtoken';
 import cors from 'cors';
-import bcrypt from 'bcrypt'; // Added for password hashing
+import bcrypt from 'bcrypt';
 
 const app = express();
 
@@ -293,6 +293,23 @@ app.post('/api/parcels/collect', authenticateToken, restrictTo('resident'), asyn
   } catch (err) {
     console.error('Error collecting parcel:', err);
     res.status(500).json({ msg: 'Failed to collect parcel' });
+  }
+});
+
+// **Temporary Endpoint to Hash a Password (Remove After Use)**
+app.post('/api/hash-password', async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ msg: 'Password is required' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    res.json({ hashedPassword });
+  } catch (err) {
+    console.error('Error hashing password:', err);
+    res.status(500).json({ msg: 'Failed to hash password' });
   }
 });
 
