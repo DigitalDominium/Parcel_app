@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Parcel App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+  <script src="https://unpkg.com/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -17,7 +17,7 @@
       width: 100%;
       height: 300px;
       border: 1px solid #ccc;
-      background: #000; /* Fallback background */
+      background: #000;
       overflow: visible;
     }
 
@@ -29,7 +29,7 @@
       height: 100% !important;
       object-fit: cover;
       z-index: 1;
-      display: block !important; /* Force visibility */
+      display: block !important;
     }
 
     #reader canvas {
@@ -39,7 +39,7 @@
       width: 100% !important;
       height: 100% !important;
       z-index: 2;
-      display: none; /* Hide canvas to avoid overlay issues */
+      display: none;
     }
 
     body {
@@ -104,7 +104,6 @@
       background: #d1e7fd;
     }
 
-    /* Responsive Design */
     @media (max-width: 768px) {
       #app {
         width: 90%;
@@ -190,7 +189,6 @@
         <input id="recipientUnit" placeholder="Unit Number" autocomplete="off" />
         <button onclick="logParcel()">Log Parcel</button>
 
-        <!-- Hidden Barcode Scanner -->
         <div id="scanner" class="hidden" style="width: 100%; margin-top: 10px;">
           <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
           <input id="manualAWB" placeholder="Enter AWB manually if camera fails" style="margin-top: 10px;" autocomplete="off">
@@ -205,7 +203,6 @@
         <button onclick="startParcelScan()">Collect Parcel</button>
       </div>
 
-      <!-- Admin Dashboard -->
       <div id="admin-actions" class="hidden">
         <h3>Admin Dashboard</h3>
         <h4>Users</h4>
@@ -220,14 +217,12 @@
   </div>
 
   <script>
-    // Function to hide all top-level sections
     function hideAllSections() {
       document.getElementById('login-form').classList.add('hidden');
       document.getElementById('register-form').classList.add('hidden');
       document.getElementById('dashboard').classList.add('hidden');
     }
 
-    // Function to hide all dashboard sub-sections
     function hideDashboardSections() {
       document.getElementById('guard-actions').classList.add('hidden');
       document.getElementById('resident-actions').classList.add('hidden');
@@ -460,61 +455,49 @@
 
     document.addEventListener("DOMContentLoaded", function () {
       if (typeof Quagga === "undefined") {
-        console.error("❌ QuaggaJS failed to load.");
+        console.error("❌ Quagga2 failed to load.");
         alert("Barcode scanner library failed to load.");
         return;
       }
-      console.log("🟢 QuaggaJS loaded successfully");
+      console.log("🟢 Quagga2 loaded successfully");
 
       hideAllSections();
       hideDashboardSections();
       document.getElementById('login-form').classList.remove('hidden');
 
-      startScanner = function (onDetectedCallback) {
+      startScanner = async function (onDetectedCallback) {
         console.log("🟢 startScanner called");
         const scannerContainer = document.getElementById('scanner');
         const reader = document.getElementById('reader');
-        reader.innerHTML = ""; // Clear previous content
+        reader.innerHTML = "";
         scannerContainer.classList.remove('hidden');
-        reader.style.display = 'block'; // Ensure reader is visible
+        reader.style.display = 'block';
 
-        Quagga.init({
-          inputStream: {
-            type: "LiveStream",
-            constraints: {
-              width: { ideal: 640 },
-              height: { ideal: 480 },
-              facingMode: { ideal: "environment" }
+        // Force layout update
+        scannerContainer.offsetHeight; // Trigger reflow
+
+        try {
+          await Quagga.init({
+            inputStream: {
+              name: "Live",
+              type: "LiveStream",
+              target: reader,
+              constraints: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: "environment"
+              }
             },
-            target: reader,
-            area: { // Define scanning area to reduce processing
-              top: "0%",
-              right: "0%",
-              left: "0%",
-              bottom: "0%"
-            }
-          },
-          locator: {
-            patchSize: "medium",
-            halfSample: true
-          },
-          numOfWorkers: navigator.hardwareConcurrency || 2,
-          locate: true,
-          decoder: {
-            readers: ["code_128_reader", "ean_reader", "upc_reader"]
-          },
-          frequency: 10 // Reduce frame processing frequency
-        }, function (err) {
-          if (err) {
-            console.error("❌ Quagga init error:", err);
-            alert("Camera initialization failed: " + err.message);
-            scannerContainer.classList.add('hidden');
-            return;
-          }
-          console.log("🟢 Quagga initialized successfully");
+            decoder: {
+              readers: ["code_128_reader", "ean_reader", "upc_reader"],
+              multiple: false
+            },
+            locate: true
+          });
+
+          console.log("🟢 Quagga2 initialized successfully");
           Quagga.start();
 
-          // Verify video element and stream
           setTimeout(() => {
             const video = reader.querySelector('video');
             if (!video) {
@@ -531,7 +514,6 @@
             }
             console.log("🟢 Video element found:", video);
             console.log("🟢 Video stream active");
-            // Force video visibility
             video.style.display = 'block';
             video.style.width = '100%';
             video.style.height = '100%';
@@ -540,20 +522,27 @@
               alert("Failed to play video stream: " + err.message);
             });
           }, 1000);
-        });
 
-        Quagga.offDetected();
-        Quagga.onDetected(onDetectedCallback);
+          Quagga.onDetected((result) => {
+            if (result && result.codeResult && result.codeResult.code) {
+              onDetectedCallback(result);
+            }
+          });
+        } catch (err) {
+          console.error("❌ Quagga2 init error:", err);
+          alert("Camera initialization failed: " + err.message);
+          scannerContainer.classList.add('hidden');
+        }
       };
 
       stopScanner = function () {
         console.log("🟢 stopScanner called");
         Quagga.stop();
+        Quagga.offDetected();
         document.getElementById('scanner').classList.add('hidden');
-        document.getElementById('manualAWB').value = ''; // Clear manual input
+        document.getElementById('manualAWB').value = '';
       };
 
-      // Scanner for AWB logging (guard)
       function startScannerForAWB() {
         startScanner(function (result) {
           const barcode = result.codeResult.code;
