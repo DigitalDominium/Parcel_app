@@ -158,16 +158,16 @@ app.post('/api/admin/users', authenticateToken, restrictTo('admin'), async (req,
 // Update a user (admin only)
 app.put('/api/admin/users/:id', authenticateToken, restrictTo('admin'), async (req, res) => {
   const { id } = req.params;
-  const { name, email, unitNumber, role } = req.body;
+  const { name, unitNumber, role } = req.body;
 
-  if (!name || !email || !role) {
-    return res.status(400).json({ msg: 'Name, email, and role are required' });
+  if (!name || !role) {
+    return res.status(400).json({ msg: 'Name and role are required' });
   }
 
   try {
     const result = await client.query(
-      'UPDATE users SET name = $1, email = $2, unit_number = $3, role = $4 WHERE id = $5 RETURNING *',
-      [name, email, unitNumber || null, role, id]
+      'UPDATE users SET name = $1, unit_number = $2, role = $3 WHERE id = $4 RETURNING *',
+      [name, unitNumber || null, role, id]
     );
 
     if (result.rows.length === 0) {
@@ -184,11 +184,7 @@ app.put('/api/admin/users/:id', authenticateToken, restrictTo('admin'), async (r
     res.json({ msg: 'User updated successfully' });
   } catch (err) {
     console.error('Error updating user:', err);
-    if (err.code === '23505') {
-      res.status(409).json({ msg: 'Email already exists' });
-    } else {
-      res.status(500).json({ msg: 'Failed to update user' });
-    }
+    res.status(500).json({ msg: 'Failed to update user' });
   }
 });
 
