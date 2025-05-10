@@ -14,6 +14,7 @@
     #reader video {
       width: 100% !important;
       height: auto !important;
+      <div id="reader" style="width: 100%; height: 300px; border: 1px solid #ccc;"></div>
     }
 
     body {
@@ -469,13 +470,11 @@
 
       startScanner = function (onDetectedCallback) {
         console.log("🟢 startScanner called");
-        
+      
         const scannerContainer = document.getElementById('scanner');
         const reader = document.getElementById('reader');
       
-        // Clear previous canvas/video
-        reader.innerHTML = "";
-      
+        reader.innerHTML = ""; // ✅ Clear previous content
         scannerContainer.classList.remove('hidden');
       
         Quagga.init({
@@ -484,9 +483,9 @@
             constraints: {
               width: 640,
               height: 480,
-              facingMode: "environment"
+              facingMode: { ideal: "environment" } // better for mobile
             },
-            target: reader
+            target: reader // ✅ must be an element
           },
           locator: {
             patchSize: "medium",
@@ -507,7 +506,7 @@
           Quagga.start();
         });
       
-        Quagga.offDetected(); // Remove any previous listeners
+        Quagga.offDetected(); // clear previous
         Quagga.onDetected(onDetectedCallback);
       };
 
